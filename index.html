@@ -7,125 +7,149 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f0f2f5; min-height: 100vh; padding-bottom: 70px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #F4F7F9; min-height: 100vh; padding-bottom: 80px; }
     
-    /* Header - 和企业微信一样 */
-    .header { background: linear-gradient(135deg, #20439a 0%, #2952cc 100%); color: #fff; padding: 16px; text-align: center; position: relative; }
-    .header .logo { width: 48px; height: 48px; margin: 0 auto 4px; }
-    .header h1 { font-size: 17px; font-weight: 600; }
-    .header .subtitle { font-size: 12px; opacity: 0.85; margin-top: 2px; }
-    
-    /* Main Card - 白色卡片 */
-    .card { background: #fff; border-radius: 8px; margin: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
-    
-    /* Scan Button - 深蓝色醒目按钮 */
-    .scan-btn {
-      display: block; width: 100%; padding: 16px 20px; background: #2952cc;
-      color: #fff; border: none; font-size: 16px; font-weight: 600; cursor: pointer;
-      text-align: center;
+    /* Header - 企业微信风格 */
+    .header {
+      background: linear-gradient(135deg, #104E8B 0%, #1a6fc4 100%);
+      color: #fff; padding: 20px 16px; text-align: center;
     }
-    .scan-btn:active { background: #1a388a; }
-    .scan-btn .icon { margin-right: 8px; }
-    .scan-note { font-size: 12px; font-weight: 400; opacity: 0.9; }
+    .header .logo-wrapper {
+      width: 56px; height: 56px; margin: 0 auto 8px;
+      background: rgba(255,255,255,0.15); border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .header .logo { width: 48px; height: 48px; object-fit: contain; }
+    .header h1 { font-size: 18px; font-weight: 500; letter-spacing: 0.5px; }
+    .header .subtitle { font-size: 11px; opacity: 0.75; margin-top: 4px; }
     
-    /* Scanner Area */
-    #reader { width: 100%; height: 280px; background: #000; display: none; }
-    #reader.show { display: block; }
-    .scan-close { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: #fff; border: none; padding: 8px 16px; border-radius: 4px; z-index: 100; }
+    /* Card */
+    .card { background: #fff; border-radius: 12px; margin: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
     
-    /* Form - 表单 */
+    /* Primary Scan Button - 大蓝色按钮 */
+    .scan-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 18px; background: linear-gradient(135deg, #104E8B 0%, #1a6fc4 100%);
+      color: #fff; border: none; font-size: 16px; font-weight: 500; cursor: pointer;
+    }
+    .scan-btn:active { opacity: 0.9; }
+    .scan-btn .icon { font-size: 20px; }
+    
+    /* Form */
     .form { padding: 16px; }
     .form-group { margin-bottom: 16px; }
-    .form-label { display: flex; font-size: 14px; color: #333; margin-bottom: 8px; font-weight: 500; }
-    .form-label .required { color: #e74c3c; margin-left: 2px; }
-    .form-select, .form-input {
-      width: 100%; padding: 12px 14px; font-size: 15px; border: 1px solid #d9d9d9;
-      border-radius: 6px; background: #fafafa; appearance: none;
-    }
-    .form-select { 
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 14px center; padding-right: 30px;
-    }
-    .form-input:focus, .form-select:focus { outline: none; border-color: #2952cc; background: #fff; }
-    .form-input::placeholder { color: #bfbfbf; }
+    .form-label { font-size: 13px; color: #666; margin-bottom: 8px; font-weight: 400; }
     
-    /* Radio Group - 出入库选择 */
-    .radio-group { display: flex; gap: 12px; margin-bottom: 16px; }
-    .radio-group label {
-      flex: 1; padding: 12px; border: 1px solid #d9d9d9; border-radius: 6px;
-      text-align: center; font-size: 14px; cursor: pointer; transition: all 0.2s;
+    /* Input with icon */
+    .input-wrap { position: relative; display: flex; align-items: center; }
+    .input-wrap .form-input {
+      flex: 1; padding: 14px 16px; font-size: 15px;
+      background: #F0F2F5; border: none; border-radius: 10px;
+      appearance: none; -webkit-appearance: none;
+    }
+    .input-wrap .form-input:focus { outline: none; background: #e8eaec; }
+    .input-wrap .form-input::placeholder { color: #C8C9CC; }
+    
+    /* Small scan button for location */
+    .input-wrap .scan-loc-btn {
+      position: absolute; right: 8px; width: 36px; height: 32px;
+      background: linear-gradient(135deg, #104E8B 0%, #1a6fc4 100%);
+      color: #fff; border: none; border-radius: 6px; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    
+    /* Radio group */
+    .radio-group { display: flex; gap: 8px; margin-bottom: 16px; }
+    .radio-group .radio-item {
+      flex: 1; padding: 12px 8px; background: #F0F2F5; border-radius: 10px;
+      text-align: center; font-size: 14px; color: #333; cursor: pointer;
+    }
+    .radio-group .radio-item.active {
+      background: #e6f0ff; color: #104E8B; font-weight: 500;
+      border: 1px solid #104E8B;
     }
     .radio-group input { display: none; }
-    .radio-group input:checked + label {
-      background: #e6f0ff; border-color: #2952cc; color: #2952cc; font-weight: 600;
+    
+    /* Select */
+    .form-select {
+      width: 100%; padding: 14px 16px; font-size: 15px;
+      background: #F0F2F5; border: none; border-radius: 10px;
+      appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center;
     }
     
     /* Result */
     .result { padding: 16px; display: none; }
     .result.show { display: block; }
-    .result-success { background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 6px; padding: 12px; }
-    .result-success h3 { color: #52c41a; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; }
-    .result-success h3::before { content: '✓'; margin-right: 6px; }
-    .result-row { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+    .result-success {
+      background: #F4F7F9; border-radius: 10px; padding: 16px;
+    }
+    .result-success h3 { color: #104E8B; font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+    .result-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e8eaec; font-size: 14px; }
     .result-row:last-child { border-bottom: none; }
     .result-label { color: #666; }
-    .result-value { font-weight: 600; color: #333; }
-    
-    /* Bottom Button */
-    .bottom-bar {
-      position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px;
-      background: #fff; box-shadow: 0 -1px 4px rgba(0,0,0,0.05);
-    }
-    .submit-btn {
-      width: 100%; padding: 14px; background: #52c41a; color: #fff;
-      border: none; border-radius: 8px; font-size: 17px; font-weight: 600;
-      cursor: pointer;
-    }
-    .submit-btn:active { background: #389e0d; }
-    .submit-btn:disabled { background: #a0a0a0; }
+    .result-value { font-weight: 500; color: #333; }
     
     /* Log */
-    .log { padding: 12px; background: #1a1a1a; color: #52c41a; font-family: 'Courier New', monospace; font-size: 11px; max-height: 120px; overflow-y: auto; margin: 12px; border-radius: 6px; }
+    .log { padding: 12px; background: #1a1a1a; color: #52c41a; font-family: monospace; font-size: 11px; max-height: 80px; overflow-y: auto; margin: 0 16px; border-radius: 8px; display: none; }
+    
+    /* Bottom Submit */
+    .bottom-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; padding: 16px;
+      background: #fff; box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    }
+    .submit-btn {
+      width: 100%; padding: 16px; background: linear-gradient(135deg, #104E8B 0%, #1a6fc4 100%);
+      color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 500;
+      cursor: pointer;
+    }
+    .submit-btn:active { opacity: 0.9; }
+    .submit-btn:disabled { background: #999; }
   </style>
 </head>
 <body>
   <!-- Header -->
   <div class="header">
-    <img class="logo" src="./logo.png" alt="Logo">
-    <h1>Aniu Home Ai 智能仓储</h1>
-    <div class="subtitle">全球仓储数据中枢（Web直扫版）</div>
+    <div class="logo-wrapper">
+      <img class="logo" src="./logo.png" alt="Aniu">
+    </div>
+    <h1>Aniu Home Ai</h1>
+    <div class="subtitle">全球仓储数据中枢</div>
   </div>
   
   <!-- Card -->
   <div class="card">
+    <!-- Primary Scan Button -->
     <button class="scan-btn" onclick="startScan()">
       <span class="icon">📷</span>
-      <span>唤起手机摄像头扫码</span>
-      <div class="scan-note">支持扫码识别SKU/包裹码/落位号</div>
+      <span>扫码识别商品 (SKU)</span>
     </button>
     
-    <div id="reader" style="position:relative;">
-      <button class="scan-close" onclick="stopScan()">关闭</button>
+    <div id="reader" style="display:none;height:280px;background:#000;position:relative;">
+      <button onclick="stopScan()" style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.6);color:#fff;padding:8px 16px;border:none;border-radius:4px;z-index:100;">关闭</button>
     </div>
     
     <!-- Form -->
     <div class="form">
-      <!-- 出入库选择 -->
-      <div class="form-label">出/入库类型</div>
-      <div class="radio-group">
-        <input type="radio" name="opType" id="in" value="in" checked>
-        <label for="in">入库 <span style="font-size:12px;opacity:0.7;">(增加库存)</span></label>
-        
-        <input type="radio" name="opType" id="out" value="out">
-        <label for="out">出库 <span style="font-size:12px;opacity:0.7;">(减少库存)</span></label>
-        
-        <input type="radio" name="opType" id="move" value="move">
-        <label for="move">调拨</label>
+      <!-- 出入库类型 -->
+      <div class="form-group">
+        <div class="form-label">出/入库类型</div>
+        <div class="radio-group">
+          <input type="radio" name="opType" id="in" value="in" checked>
+          <label class="radio-item active" for="in">📦 入库</label>
+          
+          <input type="radio" name="opType" id="out" value="out">
+          <label class="radio-item" for="out">📤 出库</label>
+          
+          <input type="radio" name="opType" id="move" value="move">
+          <label class="radio-item" for="move">🔄 调拨</label>
+        </div>
       </div>
       
-      <!-- 仓库选择 -->
+      <!-- 仓库 -->
       <div class="form-group">
-        <label class="form-label">操作仓库 <span class="required">*</span></label>
+        <div class="form-label">仓库</div>
         <select class="form-select" id="warehouse">
           <option value="F">🇨🇳 佛山仓 (F)</option>
           <option value="V" selected>🇨🇦 温哥华仓 (YVR)</option>
@@ -136,20 +160,27 @@
       
       <!-- SKU -->
       <div class="form-group">
-        <label class="form-label">SKU / 产品条码 <span class="required">*</span></label>
-        <input type="text" class="form-input" id="sku" placeholder="扫码或输入SKU/条码...">
+        <div class="form-label">SKU / 箱条码</div>
+        <div class="input-wrap">
+          <input type="text" class="form-input" id="sku" placeholder="扫码或输入SKU/箱条码...">
+        </div>
       </div>
       
       <!-- 数量 -->
       <div class="form-group">
-        <label class="form-label">操作数量 <span class="required">*</span></label>
-        <input type="number" class="form-input" id="qty" value="1" min="1">
+        <div class="form-label">操作数量</div>
+        <div class="input-wrap">
+          <input type="number" class="form-input" id="qty" value="1" min="1">
+        </div>
       </div>
       
-      <!-- 落位号 -->
+      <!-- 库位 -->
       <div class="form-group">
-        <label class="form-label">落位号 <span style="font-size:12px;color:#999;font-weight:400;">(可选)</span></label>
-        <input type="text" class="form-input" id="location" placeholder="例: V-A01-2">
+        <div class="form-label">库位</div>
+        <div class="input-wrap">
+          <input type="text" class="form-input" id="location" placeholder="例如：A-01-02">
+          <button class="scan-loc-btn" onclick="startScan()" style="position:relative;right:0;margin-left:8px;">📷</button>
+        </div>
       </div>
     </div>
   </div>
@@ -157,83 +188,68 @@
   <!-- Result -->
   <div class="card result" id="result">
     <div class="result-success">
-      <h3>操作成功</h3>
-      <div class="result-row"><span class="result-label">SKU/条码</span><span class="result-value" id="resSku">-</span></div>
+      <h3>✅ 操作成功</h3>
+      <div class="result-row"><span class="result-label">SKU</span><span class="result-value" id="resSku">-</span></div>
       <div class="result-row"><span class="result-label">仓库</span><span class="result-value" id="resWh">-</span></div>
       <div class="result-row"><span class="result-label">类型</span><span class="result-value" id="resType">-</span></div>
       <div class="result-row"><span class="result-label">数量</span><span class="result-value" id="resQty">-</span></div>
-      <div class="result-row"><span class="result-label">落位号</span><span class="result-value" id="resLoc">-</span></div>
+      <div class="result-row"><span class="result-label">库位</span><span class="result-value" id="resLoc">-</span></div>
     </div>
   </div>
   
   <!-- Log -->
   <div class="log" id="log"></div>
   
-  <!-- Bottom Button -->
+  <!-- Bottom Submit -->
   <div class="bottom-bar">
     <button class="submit-btn" onclick="submit()" id="submitBtn">提交</button>
   </div>
 
   <script>
-    // ===== 配置 =====
     const CONFIG = {
-      // 使用现有的Google Apps Script后端
-      apiUrl: 'https://script.google.com/macros/s/AKfycbzdAnUCrrCIc-6_IDBBFGXJ5NVhvuAh3bwAXDNLvcXKSFhGMqdvMP7kaK_2nCaK72eA/exec',
-      sheetId: '1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw'
+      apiUrl: 'https://script.google.com/macros/s/AKfycbzdAnUCrrCIc-6_IDBBFGXJ5NVhvuAh3bwAXDNLvcXKSFhGMqdvMP7kaK_2nCaK72eA/exec'
     };
     
     let html5QrCode = null;
-    let scannedData = '';
     
-    // ===== 日志 =====
+    // Radio group
+    document.querySelectorAll('.radio-group input').forEach((input, idx) => {
+      input.addEventListener('change', () => {
+        document.querySelectorAll('.radio-group label').forEach(l => l.classList.remove('active'));
+        document.querySelector(`label[for="${input.id}"]`).classList.add('active');
+      });
+    });
+    
     function log(msg) {
       const el = document.getElementById('log');
       const time = new Date().toLocaleTimeString();
       el.innerHTML = `<div>[${time}] ${msg}</div>` + el.innerHTML;
     }
     
-    // ===== 扫码 =====
     function startScan() {
-      const reader = document.getElementById('reader');
-      reader.classList.add('show');
-      reader.scrollIntoView({ behavior: 'smooth' });
-      
-      if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("reader");
-      }
+      document.getElementById('reader').style.display = 'block';
+      if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
       
       html5QrCode.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          scannedData = decodedText;
-          document.getElementById('sku').value = decodedText;
-          log('扫码成功: ' + decodedText);
+        (text) => {
+          document.getElementById('sku').value = text;
+          log('扫码: ' + text);
           stopScan();
-          
-          // 自动填充落位号如果符合格式
-          if (/^[FVTL]-[A-Z]\d{1,2}-\d{1,2}$/.test(decodedText)) {
-            document.getElementById('location').value = decodedText;
-            document.getElementById('sku').value = '';
-            log('识别为落位号，请输入SKU');
-          }
         },
-        (error) => { /* 忽略扫描错误 */ }
-      ).catch(err => {
-        log('启动失败: ' + err);
-        alert('无法启动摄像头，请确保允许权限');
-      });
+        () => {}
+      ).catch(err => log('错误: ' + err));
     }
     
     function stopScan() {
       if (html5QrCode) {
         html5QrCode.stop().then(() => {
-          document.getElementById('reader').classList.remove('show');
+          document.getElementById('reader').style.display = 'none';
         }).catch(() => {});
       }
     }
     
-    // ===== 提交 =====
     function submit() {
       const warehouse = document.getElementById('warehouse').value;
       const opType = document.querySelector('input[name="opType"]:checked').value;
@@ -241,74 +257,32 @@
       const qty = parseInt(document.getElementById('qty').value) || 1;
       const location = document.getElementById('location').value.trim().toUpperCase();
       
-      // 验证
-      if (!sku) {
-        alert('请扫码或输入SKU');
-        document.getElementById('sku').focus();
-        return;
-      }
+      if (!sku) { alert('请扫码或输入SKU'); return; }
       
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
       btn.textContent = '提交中...';
       
-      const payload = {
-        action: opType,
-        warehouse: warehouse,
-        barcode: sku,
-        quantity: qty,
-        location: location,
-        timestamp: new Date().toISOString()
-      };
-      
-      log('提交数据: ' + JSON.stringify(payload));
-      
-      // 发送到Google Apps Script
-      fetch(CONFIG.apiUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        body: JSON.stringify(payload)
-      })
+      fetch(CONFIG.apiUrl, { method: 'POST', body: JSON.stringify({ action: opType, warehouse, barcode: sku, quantity: qty, location, timestamp: new Date().toISOString() }) })
       .then(() => {
-        // no-cors模式下总是返回ok
-        log('提交成功');
-        showResult(warehouse, opType, sku, qty, location);
-        resetForm();
+        const whMap = { F: '佛山', V: '温哥华', T: '多伦多', L: '洛杉矶' };
+        const typeMap = { in: '入库', out: '出库', move: '调拨' };
+        
+        document.getElementById('resSku').textContent = sku;
+        document.getElementById('resWh').textContent = whMap[warehouse] + '(' + warehouse + ')';
+        document.getElementById('resType').textContent = typeMap[opType];
+        document.getElementById('resQty').textContent = qty;
+        document.getElementById('resLoc').textContent = location || '-';
+        
+        document.getElementById('result').classList.add('show');
+        document.getElementById('sku').value = '';
+        document.getElementById('location').value = '';
+        document.getElementById('qty').value = '1';
       })
-      .catch(err => {
-        log('错误: ' + err);
-        // 模拟成功
-        showResult(warehouse, opType, sku, qty, location);
-        resetForm();
-      })
-      .finally(() => {
-        btn.disabled = false;
-        btn.textContent = '提交';
-      });
+      .catch(err => log('错误: ' + err))
+      .finally(() => { btn.disabled = false; btn.textContent = '提交'; });
     }
     
-    function showResult(wh, type, sku, qty, location) {
-      const whMap = { F: '佛山', V: '温哥华', T: '多伦多', L: '洛杉矶' };
-      const typeMap = { in: '入库', out: '出库', move: '调拨' };
-      
-      document.getElementById('resSku').textContent = sku;
-      document.getElementById('resWh').textContent = whMap[wh] + ' (' + wh + ')';
-      document.getElementById('resType').textContent = typeMap[type];
-      document.getElementById('resQty').textContent = qty;
-      document.getElementById('resLoc').textContent = location || '-';
-      
-      const result = document.getElementById('result');
-      result.classList.add('show');
-      result.scrollIntoView({ behavior: 'smooth' });
-    }
-    
-    function resetForm() {
-      document.getElementById('sku').value = '';
-      document.getElementById('location').value = '';
-      document.getElementById('qty').value = '1';
-    }
-    
-    // ===== 初始化 =====
     log('系统就绪');
   </script>
 </body>
