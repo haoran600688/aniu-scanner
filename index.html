@@ -168,19 +168,33 @@
 
     window.onload = function() {
         // Fetch 动态货柜列表
-        fetch(GAS_URL + "?action=getWarehouses")
+        // 使用 Google Sheets API 直接读取 Warehouses 表格，绕过报错的 Apps Script
+        const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
+        const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Warehouses!A2:D100?key=${apiKey}`;
+        fetch(url)
             .then(res => res.json())
             .then(data => {
-                let options = "";
-                let hasRealContainers = false;
+                let fixedOptions = "";
+                let seaOptions = "";
                 
-                if(data && data.length > 0) {
-                    data.forEach(item => {
-                        if(item.name && item.name.includes("-") && !item.name.includes("Config")) {
-                            options += `<option value="${item.name}">${item.name}</option>`;
-                            hasRealContainers = true;
+                if (data.values && data.values.length > 0) {
+                    data.values.forEach(row => {
+                        const type = row[0]; // Type: Fixed or Sea
+                        const code = row[1]; // Code
+                        const name = row[2]; // Name
+                        
+                        if (type === "Fixed") {
+                            fixedOptions += `<option value="${code}">${name}</option>`;
+                        } else if (type === "Sea" && name) {
+                            seaOptions += `<option value="${code}">${name}</option>`;
                         }
                     });
+                }
+                
+                let options = fixedOptions;
+                if (seaOptions) {
+                    options += `<optgroup label="⚓ 海上货柜 (动态获取)" id="seaContainers">${seaOptions}</optgroup>`;
                 } 
                 
                 if(!hasRealContainers) {
