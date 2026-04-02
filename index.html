@@ -224,7 +224,7 @@
             
             if (actionType === '调拨') {
                 const targetWarehouse = document.getElementById('targetWarehouse').value;
-                if (warehouse === targetWarehouse) return alert("❌ 调出仓和调入仓不能是同一个！");
+                
                 
                 document.getElementById('submitBtn').innerText = "正在同步多条记录...";
                 Promise.all([
