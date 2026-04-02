@@ -11,8 +11,13 @@
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: var(--bg-color); min-height: 100vh; padding-bottom: 80px; }
     
     .header { background: linear-gradient(135deg, var(--aniu-blue) 0%, #0d6db9 100%); color: #fff; padding: 20px 16px; text-align: center; }
-    .header .logo-wrapper { width: 56px; height: 56px; margin: 0 auto 8px; background: rgba(255,255,255,0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    .header .logo { height: 95px; object-fit: contain; clip-path: inset(0 0 25% 0); margin-bottom: -15px; }
+    
+    
+    .header .logo-wrapper { width: 100%; display: flex; justify-content: center; margin-bottom: 8px; }
+    .header .logo { height: 56px; width: auto; object-fit: contain; clip-path: inset(0 0 35% 0); }
+    .header h1 { font-size: 18px; font-weight: 500; letter-spacing: 0.5px; color: #fff; }
+    .header .subtitle { font-size: 11px; opacity: 0.8; margin-top: 4px; color: #fff; }
+
     .header h1 { font-size: 18px; font-weight: 500; letter-spacing: 0.5px; }
     .header .subtitle { font-size: 11px; opacity: 0.75; margin-top: 4px; }
     
@@ -65,10 +70,7 @@
   </div>
 
   <div class="header">
-    <div class="logo-wrapper">
-      <img class="logo" src="./logo.jpg" alt="Aniu">
-    </div>
-    <h1>Aniu Home Ai</h1>
+    <div class="logo-wrapper"><img class="logo" src="./logo.jpg" alt="Aniu"></div><h1>Aniu Home Ai</h1><div class="subtitle">全球仓储数据中枢</div>
     <div class="subtitle">全球仓储数据中枢</div>
   </div>
   
