@@ -103,7 +103,7 @@
     </style>
 </head>
 <body>
-    <div id="loading-overlay">
+    <div id="loading-overlay" style="display:none;">
         <div class="spinner"></div>
         <div>从云端获取最新货柜列表...</div>
     </div>
@@ -176,9 +176,16 @@
         // 动态加载仓库/货柜配置引擎
         // ==========================================
         window.onload = function() {
+            // 确保loading层最多显示10秒
+            setTimeout(() => {
+                const overlay = document.getElementById('loading-overlay');
+                if(overlay) overlay.style.display = 'none';
+            }, 10000);
+            
             // 5秒超时保护
             const loadTimeout = setTimeout(() => {
-                document.getElementById('loading-overlay').style.display = 'none';
+                const overlay = document.getElementById('loading-overlay');
+                if(overlay) overlay.style.display = 'none';
             }, 5000);
             
             // 直接从 Google Sheets API 读取 Warehouses 表格
@@ -217,6 +224,8 @@
                 })
                 .catch(err => {
                     clearTimeout(loadTimeout);
+                    const overlay = document.getElementById('loading-overlay');
+                    if(overlay) overlay.style.display = 'none';
                     console.log("云端加载失败，使用本地配置");
                     const defaultHTML = `
                         <optgroup label="🏭 实体大仓">
