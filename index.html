@@ -83,6 +83,11 @@
             </div>
         </div>
         
+        <div class="form-group" id="operatorGroup">
+            <label>操作人员编号</label>
+            <input type="text" id="operator" placeholder="例如: A01" style="text-transform: uppercase;">
+        </div>
+        
         <div class="form-group" id="qtyGroup">
             <label>操作数量</label>
             <input type="number" id="quantity" placeholder="输入数量" value="1" min="1">
@@ -184,6 +189,7 @@
             targetGroup.style.display = "none";
             qtyGroup.style.display = "block";
             locGroup.style.display = "block";
+            document.getElementById("operatorGroup").style.display = "block";
             submitBtn.style.display = currentSku ? "block" : "none";
             
             if (type === "调拨") {
@@ -193,6 +199,7 @@
             } else if (type === "查库存") {
                 qtyGroup.style.display = "none";
                 locGroup.style.display = "none";
+                document.getElementById("operatorGroup").style.display = "none";
                 submitBtn.innerText = "🔍 查询库存";
             } else if (type === "入库") {
                 warehouseLabel.innerText = "📥 入库仓库";
@@ -258,6 +265,7 @@
             const warehouse = document.getElementById('warehouse').value;
             const quantity = document.getElementById('quantity').value || 1;
             const bin = document.getElementById('binLocation').value || "";
+            const operator = document.getElementById('operator').value || "未知";
             const btn = document.getElementById('submitBtn');
 
             if (actionType === '查库存') {
@@ -271,13 +279,19 @@
                 const now = new Date().toISOString().slice(0,16).replace("T"," ");
                 
                 Promise.all([
+                    // ERP_Inventory
                     fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
-                        method: 'POST',
-                        body: JSON.stringify({ values: [[currentSku, "", warehouse, -quantity, "", now, "调拨出库"]] })
+                        method: 'POST', body: JSON.stringify({ values: [[currentSku, "", warehouse, -quantity, "", now, "调拨出库 - " + operator]] })
                     }),
                     fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
-                        method: 'POST',
-                        body: JSON.stringify({ values: [[currentSku, "", targetWarehouse, quantity, bin, now, "调拨入库"]] })
+                        method: 'POST', body: JSON.stringify({ values: [[currentSku, "", targetWarehouse, quantity, bin, now, "调拨入库 - " + operator]] })
+                    }),
+                    // ERPOperationsLog
+                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERPOperationsLog!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
+                        method: 'POST', body: JSON.stringify({ values: [[now, operator, "调拨出库", currentSku, warehouse, -quantity, "", "Success"]] })
+                    }),
+                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERPOperationsLog!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
+                        method: 'POST', body: JSON.stringify({ values: [[now, operator, "调拨入库", currentSku, targetWarehouse, quantity, bin, "Success"]] })
                     })
                 ]).then(() => { successReset(); }).catch(e => { failReset(); });
             } else {
@@ -285,14 +299,17 @@
                 btn.disabled = true;
                 const now = new Date().toISOString().slice(0,16).replace("T"," ");
                 const qtyVal = actionType === '出库' ? -quantity : quantity;
-                const invData = [[currentSku, "", warehouse, qtyVal, bin, now, "扫码" + actionType]];
+                const invData = [[currentSku, "", warehouse, qtyVal, bin, now, "扫码" + actionType + " - " + operator]];
+                const logData = [[now, operator, actionType, currentSku, warehouse, quantity, bin, "Success"]];
                 
-                fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
-                    method: 'POST',
-                    body: JSON.stringify({ values: invData })
-                })
-                .then(() => { successReset(); })
-                .catch(e => { failReset(); });
+                Promise.all([
+                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
+                        method: 'POST', body: JSON.stringify({ values: invData })
+                    }),
+                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERPOperationsLog!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
+                        method: 'POST', body: JSON.stringify({ values: logData })
+                    })
+                ]).then(() => { successReset(); }).catch(e => { failReset(); });
             }
         }
 
