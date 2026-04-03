@@ -176,27 +176,24 @@
         // 动态加载仓库/货柜配置引擎
         // ==========================================
         window.onload = function() {
-            // 确保loading层最多显示10秒
-            setTimeout(() => {
-                const overlay = document.getElementById('loading-overlay');
-                if(overlay) overlay.style.display = 'none';
-            }, 10000);
-            
-            // 5秒超时保护
-            const loadTimeout = setTimeout(() => {
-                const overlay = document.getElementById('loading-overlay');
-                if(overlay) overlay.style.display = 'none';
-            }, 5000);
-            
-            // 直接从 Google Sheets API 读取 Warehouses 表格
             const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
             const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
             
+            // 页面加载完成后立即隐藏loading
+            setTimeout(function(){
+                document.getElementById('loading-overlay').style.display = 'none';
+            }, 500);
+            
+            // 备用：3秒后强制隐藏
+            setTimeout(function(){
+                document.getElementById('loading-overlay').style.display = 'none';
+            }, 3000);
+            
+            // 尝试加载仓库数据
             fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Warehouses!A2:D100?key=${apiKey}`)
                 .then(res => res.json())
                 .then(data => {
-                    clearTimeout(loadTimeout);
-                    if(!data.values || data.values.length === 0) throw new Error("无数据");
+                    if(!data.values || data.values.length === 0) return;
                     
                     let fixedHtml = "";
                     let seaHtml = "";
@@ -220,27 +217,9 @@
                     
                     document.getElementById('warehouse').innerHTML = html;
                     document.getElementById('targetWarehouse').innerHTML = html;
-                    document.getElementById('loading-overlay').style.display = 'none';
                 })
-                .catch(err => {
-                    clearTimeout(loadTimeout);
-                    const overlay = document.getElementById('loading-overlay');
-                    if(overlay) overlay.style.display = 'none';
-                    console.log("云端加载失败，使用本地配置");
-                    const defaultHTML = `
-                        <optgroup label="🏭 实体大仓">
-                            <option value="F">🇨🇳 佛山实体仓 (F)</option>
-                            <option value="V">🇨🇦 温哥华仓 (YVR)</option>
-                            <option value="T">🇨🇦 多伦多仓 (YYZ)</option>
-                            <option value="L">🇺🇸 洛杉矶仓 (LAX)</option>
-                        </optgroup>
-                        <optgroup label="⚓ 海上货柜">
-                            <option value="CH-YVR-01">⚓ 20260415-温哥华 (CH-YVR-01)</option>
-                        </optgroup>
-                    `;
-                    document.getElementById('warehouse').innerHTML = defaultHTML;
-                    document.getElementById('targetWarehouse').innerHTML = defaultHTML;
-                    document.getElementById('loading-overlay').style.display = 'none';
+                .catch(function(err) {
+                    console.log('加载仓库失败', err);
                 });
         };
         function toggleTransfer() {
