@@ -5,7 +5,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Aniu Home Ai 智能仓储</title>
     <!-- 引入纯 Web 扫码库 -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript">
+    function checkInventory(sku) {
+        if (!sku) return alert('请扫码或输入SKU');
+        
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.textContent = '查询中...';
+        
+        const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
+        const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+        
+        fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/ERP_Inventory!A2:G1000?key=${apiKey}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.values || data.values.length === 0) {
+                    alert('未找到该产品库存记录');
+                    return;
+                }
+                
+                // Filter by SKU
+                const matches = data.values.filter(row => row[0] && row[0].toLowerCase() === sku.toLowerCase());
+                
+                if (matches.length === 0) {
+                    // Also try partial match
+                    const partialMatches = data.values.filter(row => row[0] && row[0].toLowerCase().includes(sku.toLowerCase()));
+                    if (partialMatches.length === 0) {
+                        alert('未找到SKU为 ' + sku + ' 的库存记录');
+                        return;
+                    }
+                    showInventoryResult(partialMatches);
+                } else {
+                    showInventoryResult(matches);
+                }
+            })
+            .catch(err => {
+                alert('查询失败，请重试');
+                console.error(err);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = '🔍 查询库存';
+            });
+    }
+    
+    function showInventoryResult(rows) {
+        let msg = "📦 库存查询结果\n\n";
+        
+        let totalQty = 0;
+        rows.forEach(row => {
+            const sku = row[0] || '';
+            const warehouse = row[2] || '-';
+            const qty = parseInt(row[3]) || 0;
+            const bin = row[4] || '-';
+            const date = row[5] || '';
+            const note = row[6] || '';
+            
+            totalQty += qty;
+            msg += `📍 仓库: ${warehouse}\n`;
+            msg += `   数量: ${qty}\n`;
+            msg += `   落位: ${bin}\n`;
+            msg += `   更新时间: ${date}\n`;
+            msg += `   备注: ${note}\n\n`;
+        });
+        
+        msg += `━━━━━━━━━━━━━━━━\n`;
+        msg += `📊 总计: ${totalQty} 件`;
+        
+        document.getElementById('result').innerHTML = '<div class="result-success"><h3>🔍 查询结果</h3>' + 
+            rows.map(row => `<div class="result-row"><span class="result-label">${row[2]}</span><span class="result-value">${row[3] || 0} 件 (落位: ${row[4] || '-'})</span></div>`).join('') +
+            `<div class="result-row" style="border-top:1px solid #ccc;margin-top:10px;padding-top:10px;"><span class="result-label">📊 总计</span><span class="result-value">${rows.reduce((sum, row) => sum + (parseInt(row[3])||0), 0)} 件</span></div></div>`;
+        document.getElementById('result').classList.add('show');
+        
+        alert(msg);
+    }
+</script>
     <style>
         :root { --aniu-blue: #0A4B78; --bg-color: #F4F7F9; }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; color: #333; }
@@ -79,7 +153,7 @@
             </div>
         </div>
         
-        <div class="form-group">
+        <div class="form-group" id="qtyGroup" style="display:block;">
             <label>操作数量</label>
             <input type="number" id="quantity" placeholder="输入数量" value="1" min="1">
         </div>
@@ -161,6 +235,68 @@
                 });
         };
         function toggleTransfer() {
+        document.querySelectorAll('.radio-group label').forEach(l => l.classList.remove('active'));
+        const type = document.querySelector('input[name="opType"]:checked').value;
+        document.querySelector(`label[for="${document.querySelector('input[name="opType"]:checked').id}"]`).classList.add('active');
+        
+        const targetGroup = document.getElementById("targetWarehouseGroup");
+        const warehouseLabel = document.getElementById("warehouseLabel");
+        const qtyGroup = document.getElementById("qtyGroup");
+        const locGroup = document.getElementById("locGroup");
+        const submitBtn = document.getElementById("submitBtn");
+        
+        if (type === "调拨") {
+            targetGroup.style.display = "block";
+            warehouseLabel.innerText = "📤 调出仓库 (来源地)";
+            qtyGroup.style.display = "block";
+            locGroup.style.display = "block";
+            submitBtn.style.display = "block";
+        } else if (type === "查库存") {
+            targetGroup.style.display = "none";
+            warehouseLabel.innerText = "查询仓库 (可选)";
+            qtyGroup.style.display = "none";
+            locGroup.style.display = "none";
+            submitBtn.textContent = "🔍 查询库存";
+        } else {
+            targetGroup.style.display = "none";
+            warehouseLabel.innerText = "操作仓库/在途货柜";
+            qtyGroup.style.display = "block";
+            locGroup.style.display = "block";
+            submitBtn.textContent = "✅ 确认提交至系统";
+        }
+    }
+    
+    function toggleCheck() {
+        document.querySelectorAll('.radio-group label').forEach(l => l.classList.remove('active'));
+        const type = document.querySelector('input[name="opType"]:checked').value;
+        document.querySelector(`label[for="${document.querySelector('input[name="opType"]:checked').id}"]`).classList.add('active');
+        
+        const targetGroup = document.getElementById("targetWarehouseGroup");
+        const warehouseLabel = document.getElementById("warehouseLabel");
+        const qtyGroup = document.getElementById("qtyGroup");
+        const locGroup = document.getElementById("locGroup");
+        const submitBtn = document.getElementById("submitBtn");
+        
+        if (type === "查库存") {
+            targetGroup.style.display = "none";
+            warehouseLabel.innerText = "查询仓库 (可选)";
+            qtyGroup.style.display = "none";
+            locGroup.style.display = "none";
+            submitBtn.textContent = "🔍 查询库存";
+        } else if (type === "调拨") {
+            targetGroup.style.display = "block";
+            warehouseLabel.innerText = "📤 调出仓库 (来源地)";
+            qtyGroup.style.display = "block";
+            locGroup.style.display = "block";
+            submitBtn.textContent = "✅ 确认提交至系统";
+        } else {
+            targetGroup.style.display = "none";
+            warehouseLabel.innerText = "操作仓库/在途货柜";
+            qtyGroup.style.display = "block";
+            locGroup.style.display = "block";
+            submitBtn.textContent = "✅ 确认提交至系统";
+        }
+    }
             const type = document.getElementById('actionType').value;
             const targetGroup = document.getElementById('targetWarehouseGroup');
             const warehouseLabel = document.getElementById('warehouseLabel');
@@ -283,6 +419,80 @@
             alert("提交失败，请检查网络");
             document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
         }
-    </script>
+    
+    function checkInventory(sku) {
+        if (!sku) return alert('请扫码或输入SKU');
+        
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.textContent = '查询中...';
+        
+        const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
+        const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+        
+        fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/ERP_Inventory!A2:G1000?key=${apiKey}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.values || data.values.length === 0) {
+                    alert('未找到该产品库存记录');
+                    return;
+                }
+                
+                // Filter by SKU
+                const matches = data.values.filter(row => row[0] && row[0].toLowerCase() === sku.toLowerCase());
+                
+                if (matches.length === 0) {
+                    // Also try partial match
+                    const partialMatches = data.values.filter(row => row[0] && row[0].toLowerCase().includes(sku.toLowerCase()));
+                    if (partialMatches.length === 0) {
+                        alert('未找到SKU为 ' + sku + ' 的库存记录');
+                        return;
+                    }
+                    showInventoryResult(partialMatches);
+                } else {
+                    showInventoryResult(matches);
+                }
+            })
+            .catch(err => {
+                alert('查询失败，请重试');
+                console.error(err);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = '🔍 查询库存';
+            });
+    }
+    
+    function showInventoryResult(rows) {
+        let msg = "📦 库存查询结果\n\n";
+        
+        let totalQty = 0;
+        rows.forEach(row => {
+            const sku = row[0] || '';
+            const warehouse = row[2] || '-';
+            const qty = parseInt(row[3]) || 0;
+            const bin = row[4] || '-';
+            const date = row[5] || '';
+            const note = row[6] || '';
+            
+            totalQty += qty;
+            msg += `📍 仓库: ${warehouse}\n`;
+            msg += `   数量: ${qty}\n`;
+            msg += `   落位: ${bin}\n`;
+            msg += `   更新时间: ${date}\n`;
+            msg += `   备注: ${note}\n\n`;
+        });
+        
+        msg += `━━━━━━━━━━━━━━━━\n`;
+        msg += `📊 总计: ${totalQty} 件`;
+        
+        document.getElementById('result').innerHTML = '<div class="result-success"><h3>🔍 查询结果</h3>' + 
+            rows.map(row => `<div class="result-row"><span class="result-label">${row[2]}</span><span class="result-value">${row[3] || 0} 件 (落位: ${row[4] || '-'})</span></div>`).join('') +
+            `<div class="result-row" style="border-top:1px solid #ccc;margin-top:10px;padding-top:10px;"><span class="result-label">📊 总计</span><span class="result-value">${rows.reduce((sum, row) => sum + (parseInt(row[3])||0), 0)} 件</span></div></div>`;
+        document.getElementById('result').classList.add('show');
+        
+        alert(msg);
+    }
+</script>
 </body>
 </html>
