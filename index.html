@@ -236,15 +236,37 @@
                 if (warehouse === targetWarehouse) return alert("❌ 调出仓和调入仓不能是同一个！");
                 
                 document.getElementById('submitBtn').innerText = "正在同步多条记录...";
+                // 调拨出库 - 记录到 ERP_Inventory
+                const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
+                const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+                const now = new Date().toISOString().slice(0,16).replace("T"," ");
+                
                 Promise.all([
-                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "", user: document.getElementById("operator").value || "未填写" }) }),
-                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin, user: document.getElementById("operator").value || "未填写" }) })
+                    fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/ERP_Inventory!A:append?key=${apiKey}&valueInputOption=USER_ENTERED`, {
+                        method: 'POST',
+                        body: JSON.stringify({ values: [[currentSku, "", warehouse, -quantity, "", now, "调拨出库"]] })
+                    }),
+                    fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/ERP_Inventory!A:append?key=${apiKey}&valueInputOption=USER_ENTERED`, {
+                        method: 'POST',
+                        body: JSON.stringify({ values: [[currentSku, "", targetWarehouse, quantity, bin || "", now, "调拨入库"]] })
+                    })
                 ]).then(() => { successReset(); }).catch(e => { failReset(); });
             } else {
                 document.getElementById('submitBtn').innerText = "正在同步至系统...";
-                fetch(GAS_URL, {
-                    method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin, user: document.getElementById("operator").value || "未填写" })
-                }).then(() => { successReset(); }).catch(e => { failReset(); });
+                // 直接写入 ERP_Inventory 表（通过 Google Sheets API）
+                const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
+                const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+                const now = new Date().toISOString().slice(0,16).replace("T"," ");
+                
+                // 构造库存记录
+                const invData = [[currentSku, "", warehouse, quantity, bin || "", now, "扫码入库"]];
+                
+                fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/ERP_Inventory!A:append?key=${apiKey}&valueInputOption=USER_ENTERED`, {
+                    method: 'POST',
+                    body: JSON.stringify({ values: invData })
+                })
+                .then(() => { successReset(); })
+                .catch(e => { failReset(); });
             }
         };
 
