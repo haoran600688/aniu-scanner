@@ -89,6 +89,11 @@
             <input type="text" id="operator" placeholder="例如: A003" style="text-transform: uppercase;">
         </div>
         
+        <div class="form-group">
+            <label>操作人编号</label>
+            <input type="text" id="operator" placeholder="例如: A003" style="text-transform: uppercase;">
+        </div>
+        
         <button id="submitBtn" class="submit-btn">✅ 确认提交至系统</button>
     </div>
 
@@ -102,6 +107,11 @@
         // 动态加载仓库/货柜配置引擎
         // ==========================================
         window.onload = function() {
+            // 5秒超时保护
+            const loadTimeout = setTimeout(() => {
+                document.getElementById('loading-overlay').style.display = 'none';
+            }, 5000);
+            
             // 直接从 Google Sheets API 读取 Warehouses 表格
             const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
             const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
@@ -109,6 +119,7 @@
             fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Warehouses!A2:D100?key=${apiKey}`)
                 .then(res => res.json())
                 .then(data => {
+                    clearTimeout(loadTimeout);
                     if(!data.values || data.values.length === 0) throw new Error("无数据");
                     
                     let fixedHtml = "";
@@ -136,6 +147,7 @@
                     document.getElementById('loading-overlay').style.display = 'none';
                 })
                 .catch(err => {
+                    clearTimeout(loadTimeout);
                     console.log("云端加载失败，使用本地配置");
                     const defaultHTML = `
                         <optgroup label="🏭 实体大仓">
@@ -153,8 +165,6 @@
                     document.getElementById('loading-overlay').style.display = 'none';
                 });
         };
-
-        // UI 联动逻辑
         function toggleTransfer() {
             const type = document.getElementById('actionType').value;
             const targetGroup = document.getElementById('targetWarehouseGroup');
