@@ -6,6 +6,7 @@
     <title>Aniu Home Ai 智能仓储</title>
     <!-- 引入纯 Web 扫码库 -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script>if(typeof Html5Qrcode === "undefined") console.error("html5-qrcode library NOT loaded!");</script>
     <script>
     function checkInventory(sku) {
         if (!sku) return alert('请扫码或输入SKU');
@@ -273,61 +274,56 @@
             const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
             const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
             
-            // 页面加载完成后立即隐藏loading
+            // Hide loading after 3 seconds max
             setTimeout(function(){
-                document.getElementById('loading-overlay').style.display = 'none';
-            }, 500);
-            
-            // 备用：3秒后强制隐藏
-            setTimeout(function(){
-                document.getElementById('loading-overlay').style.display = 'none';
+                var overlay = document.getElementById("loading-overlay");
+                if(overlay) overlay.style.display = "none";
+                var status = document.getElementById("cloud-status");
+                if(status) status.innerText = "✅ 已就绪";
             }, 3000);
             
-            // 尝试加载仓库数据
-            console.log('开始加载仓库...');
-                    document.getElementById('cloud-status').innerText = '☁️ 正在从云端加载仓库数据...';
-            document.getElementById('warehouse').innerHTML = '<option value="">加载中...</option>';
-                    document.getElementById('targetWarehouse').innerHTML = '<option value="">加载中...</option>';
-            // Try direct API first, fallback to JSONP-style or just use cached local data
-            fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Warehouses!A2:D100?key=${apiKey}`)
-                .then(res => res.json())
-                .then(data => {
+            // Update status
+            var statusEl = document.getElementById("cloud-status");
+            if(statusEl) statusEl.innerText = "☁️ 正在加载仓库数据...";
+            
+            // Load warehouse data from Google Sheets
+            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Warehouses!A2:D100?key=" + apiKey)
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
                     if(!data.values || data.values.length === 0) {
-                        document.getElementById('cloud-status').innerText = '⚠️ 云端数据为空，使用本地数据';
+                        if(statusEl) statusEl.innerText = "⚠️ 云端数据为空";
                         return;
                     }
-                    document.getElementById('cloud-status').innerText = '✅ 云端仓库数据加载成功';
                     
-                    let fixedHtml = "";
-                    let seaHtml = "";
+                    var fixedHtml = "";
+                    var seaHtml = "";
                     
-                    data.values.forEach(row => {
-                        const type = row[0];
-                        const code = row[1];
-                        const name = row[2];
+                    for(var i = 0; i < data.values.length; i++) {
+                        var row = data.values[i];
+                        var type = row[0];
+                        var code = row[1];
+                        var name = row[2];
                         
                         if(type === "Fixed" && name) {
-                            fixedHtml += `<option value="${code}">${name}</option>`;
+                            fixedHtml += "<option value=\"" + code + "\">" + name + "</option>";
                         } else if(type === "Sea" && name) {
-                            seaHtml += `<option value="${code}">${name}</option>`;
+                            seaHtml += "<option value=\"" + code + "\">" + name + "</option>";
                         }
-                    });
-                    
-                    let html = fixedHtml;
-                    if(seaHtml) {
-                        html += `<optgroup label="⚓ 海上货柜">${seaHtml}</optgroup>`;
                     }
                     
-                    document.getElementById('warehouse').innerHTML = html;
-                    document.getElementById('targetWarehouse').innerHTML = html;
+                    var html = fixedHtml;
+                    if(seaHtml) {
+                        html += "<optgroup label=\"⚓ 海上货柜\">" + seaHtml + "</optgroup>";
+                    }
+                    
+                    document.getElementById("warehouse").innerHTML = html;
+                    document.getElementById("targetWarehouse").innerHTML = html;
+                    
+                    if(statusEl) statusEl.innerText = "✅ 仓库数据加载成功";
                 })
                 .catch(function(err) {
-                    console.log('加载仓库失败:', err);
-                    document.getElementById('cloud-status').innerText = '⚠️ 云端加载失败，使用本地数据';
-                    console.log('可能是网络问题或API限制');
-                    // Use fallback data
-                    document.getElementById('warehouse').innerHTML = '<option value="F">🇨🇳 佛山实体仓 (F)</option><option value="V">🇨🇦 温哥华实体仓 (V)</option><option value="T">🇨🇦 多伦多实体仓 (T)</option><option value="L">🇺🇸 洛杉矶实体仓 (L)</option>';
-                    document.getElementById('targetWarehouse').innerHTML = '<option value="F">🇨🇳 佛山实体仓 (F)</option><option value="V">🇨🇦 温哥华实体仓 (V)</option><option value="T">🇨🇦 多伦多实体仓 (T)</option><option value="L">🇺🇸 洛杉矶实体仓 (L)</option>';
+                    console.log("加载仓库失败:", err);
+                    if(statusEl) statusEl.innerText = "⚠️ 加载失败，使用本地数据";
                 });
         };
         function toggleTransfer() {
@@ -419,11 +415,22 @@
 
         // --- 扫码核心逻辑 ---
         function startScanner(target) {
+            console.log("开始扫码, target:", target);
             currentScanTarget = target;
             document.getElementById('reader-container').style.display = 'block';
             document.getElementById('scanSkuBtn').style.display = 'none';
+            
+            // Check if html5QrCode is available
+            if (typeof Html5Qrcode === 'undefined') {
+                alert("扫码库未加载，请刷新页面或检查网络连接");
+                document.getElementById('reader-container').style.display = 'none';
+                document.getElementById('scanSkuBtn').style.display = 'block';
+                return;
+            }
+            
             if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
             
+            console.log("启动摄像头...");
             html5QrCode.start(
                 { facingMode: "environment" }, 
                 { fps: 10, qrbox: { width: 250, height: 250 } },
