@@ -101,6 +101,7 @@
     <script>
         const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
         const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbzcKkOQBr_QvRD6IQ_MsQ6ccCpe3_H8Mk4HvwI6zJMmZatx476yK6IOiJK_xl65135w/exec";
         let html5QrCode;
         let currentScanTarget = 'sku';
         let currentSku = "";
@@ -184,12 +185,13 @@
             const warehouseLabel = document.getElementById("warehouseLabel");
             const qtyGroup = document.getElementById("qtyGroup");
             const locGroup = document.getElementById("locGroup");
+            const operatorGroup = document.getElementById("operatorGroup");
             const submitBtn = document.getElementById("submitBtn");
             
             targetGroup.style.display = "none";
             qtyGroup.style.display = "block";
             locGroup.style.display = "block";
-            document.getElementById("operatorGroup").style.display = "block";
+            operatorGroup.style.display = "block";
             submitBtn.style.display = currentSku ? "block" : "none";
             
             if (type === "调拨") {
@@ -199,7 +201,7 @@
             } else if (type === "查库存") {
                 qtyGroup.style.display = "none";
                 locGroup.style.display = "none";
-                document.getElementById("operatorGroup").style.display = "none";
+                operatorGroup.style.display = "none";
                 submitBtn.innerText = "🔍 查询库存";
             } else if (type === "入库") {
                 warehouseLabel.innerText = "📥 入库仓库";
@@ -276,40 +278,18 @@
                 
                 btn.innerText = "正在同步多条记录...";
                 btn.disabled = true;
-                const now = new Date().toISOString().slice(0,16).replace("T"," ");
                 
                 Promise.all([
-                    // ERP_Inventory
-                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
-                        method: 'POST', body: JSON.stringify({ values: [[currentSku, "", warehouse, -quantity, "", now, "调拨出库 - " + operator]] })
-                    }),
-                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
-                        method: 'POST', body: JSON.stringify({ values: [[currentSku, "", targetWarehouse, quantity, bin, now, "调拨入库 - " + operator]] })
-                    }),
-                    // ERPOperationsLog
-                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERPOperationsLog!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
-                        method: 'POST', body: JSON.stringify({ values: [[now, operator, "调拨出库", currentSku, warehouse, -quantity, "", "Success"]] })
-                    }),
-                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERPOperationsLog!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
-                        method: 'POST', body: JSON.stringify({ values: [[now, operator, "调拨入库", currentSku, targetWarehouse, quantity, bin, "Success"]] })
-                    })
+                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "", user: operator }) }),
+                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin, user: operator }) })
                 ]).then(() => { successReset(); }).catch(e => { failReset(); });
             } else {
                 btn.innerText = "正在同步至系统...";
                 btn.disabled = true;
-                const now = new Date().toISOString().slice(0,16).replace("T"," ");
-                const qtyVal = actionType === '出库' ? -quantity : quantity;
-                const invData = [[currentSku, "", warehouse, qtyVal, bin, now, "扫码" + actionType + " - " + operator]];
-                const logData = [[now, operator, actionType, currentSku, warehouse, quantity, bin, "Success"]];
                 
-                Promise.all([
-                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
-                        method: 'POST', body: JSON.stringify({ values: invData })
-                    }),
-                    fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERPOperationsLog!A:append?key=" + apiKey + "&valueInputOption=USER_ENTERED", {
-                        method: 'POST', body: JSON.stringify({ values: logData })
-                    })
-                ]).then(() => { successReset(); }).catch(e => { failReset(); });
+                fetch(GAS_URL, {
+                    method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin, user: operator })
+                }).then(() => { successReset(); }).catch(e => { failReset(); });
             }
         }
 
