@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Aniu Home Ai 智能仓储</title>
     <!-- 引入纯 Web 扫码库 -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script>
     function checkInventory(sku) {
         if (!sku) return alert('请扫码或输入SKU');
         
@@ -189,6 +190,7 @@
     </div>
     
     <div class="card">
+        <div id="cloud-status" style="padding:8px 12px;background:#e8f4fd;border-radius:8px;margin-bottom:15px;font-size:13px;color:#0066cc;">☁️ 初始化中...</div>
         <!-- SKU 扫码 -->
         <button id="scanSkuBtn" class="scan-btn">📷 扫码识别商品 (SKU)</button>
         <div id="sku-display">等待扫码...</div>
@@ -211,6 +213,7 @@
         <div class="form-group" style="margin-top: 20px;">
             <label id="warehouseLabel">操作仓库/在途货柜</label>
             <select id="warehouse">
+                <option value="">正在加载仓库数据...</option>
                 <option value="F">🇨🇳 佛山实体仓 (F)</option>
                 <option value="V">🇨🇦 温哥华实体仓 (V)</option>
                 <option value="T">🇨🇦 多伦多实体仓 (T)</option>
@@ -281,10 +284,19 @@
             }, 3000);
             
             // 尝试加载仓库数据
+            console.log('开始加载仓库...');
+                    document.getElementById('cloud-status').innerText = '☁️ 正在从云端加载仓库数据...';
+            document.getElementById('warehouse').innerHTML = '<option value="">加载中...</option>';
+                    document.getElementById('targetWarehouse').innerHTML = '<option value="">加载中...</option>';
+            // Try direct API first, fallback to JSONP-style or just use cached local data
             fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Warehouses!A2:D100?key=${apiKey}`)
                 .then(res => res.json())
                 .then(data => {
-                    if(!data.values || data.values.length === 0) return;
+                    if(!data.values || data.values.length === 0) {
+                        document.getElementById('cloud-status').innerText = '⚠️ 云端数据为空，使用本地数据';
+                        return;
+                    }
+                    document.getElementById('cloud-status').innerText = '✅ 云端仓库数据加载成功';
                     
                     let fixedHtml = "";
                     let seaHtml = "";
@@ -310,7 +322,9 @@
                     document.getElementById('targetWarehouse').innerHTML = html;
                 })
                 .catch(function(err) {
-                    console.log('加载仓库失败', err);
+                    console.log('加载仓库失败:', err);
+                    document.getElementById('cloud-status').innerText = '⚠️ 云端加载失败，使用本地数据';
+                    console.log('可能是网络问题或API限制');
                     // Use fallback data
                     document.getElementById('warehouse').innerHTML = '<option value="F">🇨🇳 佛山实体仓 (F)</option><option value="V">🇨🇦 温哥华实体仓 (V)</option><option value="T">🇨🇦 多伦多实体仓 (T)</option><option value="L">🇺🇸 洛杉矶实体仓 (L)</option>';
                     document.getElementById('targetWarehouse').innerHTML = '<option value="F">🇨🇳 佛山实体仓 (F)</option><option value="V">🇨🇦 温哥华实体仓 (V)</option><option value="T">🇨🇦 多伦多实体仓 (T)</option><option value="L">🇺🇸 洛杉矶实体仓 (L)</option>';
