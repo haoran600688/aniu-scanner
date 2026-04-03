@@ -5,7 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Aniu Home Ai 智能仓储</title>
     <!-- 引入纯 Web 扫码库 -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript">
+        function fetchOperatorList() {
+            const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
+            const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+            
+            fetch(`https://sheets.googleapis.com/v4/spreadsheets/\${sheetId}/values/Employees!A2:C100?key=\${apiKey}`)
+                .then(res => res.json())
+                .then(data => {
+                    if(!data.values || data.values.length === 0) return;
+                    
+                    const select = document.getElementById('operator');
+                    data.values.forEach(row => {
+                        const code = row[0]; // 员工编号
+                        const name = row[1]; // 姓名
+                        if(code) {
+                            const option = document.createElement('option');
+                            option.value = code;
+                            option.textContent = name ? \`\${name} (\${code})\` : code;
+                            select.appendChild(option);
+                        }
+                    });
+                })
+                .catch(err => console.log("加载员工列表失败", err));
+        }
+</script>
     <style>
         :root { --aniu-blue: #0A4B78; --bg-color: #F4F7F9; }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; color: #333; }
@@ -55,20 +79,20 @@
                 <option value="入库">📥 入库 (增加库存)</option>
                 <option value="出库">📤 出库 (扣减库存)</option>
                 <option value="调拨">🚚 调拨 (库存跨仓转移)</option>
-            </select>
+            
         </div>
         
         <div class="form-group" style="margin-top: 20px;">
             <label id="warehouseLabel">操作仓库/在途货柜</label>
             <select id="warehouse">
                 <option value="加载中">正在加载货柜...</option>
-            </select>
+            
         </div>
 
         <div class="form-group target-group" id="targetWarehouseGroup">
             <label style="color: #10B981; font-weight: bold;">➡️ 调入仓库 (目标地)</label>
             <select id="targetWarehouse">
-            </select>
+            
         </div>
 
         <div class="form-group">
@@ -79,7 +103,14 @@
             </div>
         </div>
         
+                
         <div class="form-group">
+            <label>操作人</label>
+            <input type="text" id="operator" placeholder="例如: A003" style="text-transform: uppercase;">
+                <option value="">请选择操作人</option>
+            
+        </div>
+            <div class="form-group">
             <label>操作数量</label>
             <input type="number" id="quantity" placeholder="输入数量" value="1" min="1">
         </div>
@@ -97,6 +128,8 @@
         // 动态加载仓库/货柜配置引擎
         // ==========================================
         window.onload = function() {
+            // 加载操作人列表
+            fetchOperatorList();
             // 直接从 Google Sheets API 读取 Warehouses 表格
             const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
             const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
@@ -228,13 +261,13 @@
                 
                 document.getElementById('submitBtn').innerText = "正在同步多条记录...";
                 Promise.all([
-                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "", user: "企微(转移)" }) }),
-                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin, user: "企微(转移)" }) })
+                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "", user: document.getElementById("operator").value || "未填写" }) }),
+                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin, user: document.getElementById("operator").value || "未填写" }) })
                 ]).then(() => { successReset(); }).catch(e => { failReset(); });
             } else {
                 document.getElementById('submitBtn').innerText = "正在同步至系统...";
                 fetch(GAS_URL, {
-                    method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin, user: "企微操作" })
+                    method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin, user: document.getElementById("operator").value || "未填写" })
                 }).then(() => { successReset(); }).catch(e => { failReset(); });
             }
         };
@@ -252,6 +285,30 @@
             alert("提交失败，请检查网络");
             document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
         }
-    </script>
+    
+        function fetchOperatorList() {
+            const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
+            const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+            
+            fetch(`https://sheets.googleapis.com/v4/spreadsheets/\${sheetId}/values/Employees!A2:C100?key=\${apiKey}`)
+                .then(res => res.json())
+                .then(data => {
+                    if(!data.values || data.values.length === 0) return;
+                    
+                    const select = document.getElementById('operator');
+                    data.values.forEach(row => {
+                        const code = row[0]; // 员工编号
+                        const name = row[1]; // 姓名
+                        if(code) {
+                            const option = document.createElement('option');
+                            option.value = code;
+                            option.textContent = name ? \`\${name} (\${code})\` : code;
+                            select.appendChild(option);
+                        }
+                    });
+                })
+                .catch(err => console.log("加载员工列表失败", err));
+        }
+</script>
 </body>
 </html>
