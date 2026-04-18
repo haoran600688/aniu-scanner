@@ -120,6 +120,14 @@ if(!sku) {
         // 页面初始化：加载仓库数据
         window.onload = function() {
 
+            // 影子表同步：加载 SKU -> 产品名称
+            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Products!A2:B2000?key=" + apiKey)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.values) data.values.forEach(r => { if(r[0] && r[1]) skuToNameMap[String(r[0]).trim().toUpperCase()] = r[1]; });
+                }).catch(e => console.log("Mapping skip"));
+
+
             // 新增：从云端 Products 表拉取 SKU 到产品名称的映射
             fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Products!A2:B2000?key=" + apiKey)
                 .then(res => res.json())
@@ -384,7 +392,7 @@ if(!sku) {
                         resultHtml += '<h3>📍 库位 '+binNum+' 货品明细</h3>';
                         items.forEach(r => {
                             resultHtml += '<div style="margin-bottom:8px; border-bottom:1px solid #dcfce7; padding-bottom:8px; display:flex; justify-content:space-between; font-size:14px;">';
-                            resultHtml += '<div><strong style="color:#4b5563;">SKU:</strong> '+ (r[0] || '未知') +'</div>';
+                            resultHtml += '<div><strong style="color:#4b5563;">SKU:</strong> '+ (r[0] || '未知') +' <span style="font-size:12px;color:#888;">(' + (skuToNameMap[String(r[0]).toUpperCase()] || '新产品') + ')</span></div>';
                             resultHtml += '<div><strong style="color:#4b5563;">数量:</strong> <span style="color:#059669;font-weight:bold;font-size:16px;">'+r[3]+'</span></div>';
                             resultHtml += '</div>';
                         });
@@ -418,11 +426,12 @@ if(!sku) {
                     } else {
                         let title = sku ? "📦 "+sku+" 库存分布" : (warehouseFilter ? "🏢 "+warehouseFilter+" 仓库明细" : "🌐 全仓可用库存总览");
                         resultHtml += '<h3>' + title + '</h3>';
+                            if(sku) { const n = skuToNameMap[sku.toUpperCase()]; if(n) resultHtml += '<div style="font-size:13px;color:#666;margin-bottom:10px;">产品名称: '+n+'</div>'; }
                         let totalQty = 0;
                         rows.forEach(r => {
                             totalQty += parseInt(r[3] || 0);
                             resultHtml += '<div style="margin-bottom:8px; border-bottom:1px solid #dcfce7; padding-bottom:8px; font-size:14px;">';
-                            if(!sku) resultHtml += '<div style="margin-bottom:4px;"><strong style="color:#4b5563;">SKU:</strong> '+(r[0] || '无')+'</div>';
+                            if(!sku) { const n = skuToNameMap[String(r[0]).toUpperCase()] || '新产品'; resultHtml += '<div style="margin-bottom:4px;"><strong style="color:#4b5563;">SKU:</strong> '+(r[0] || '无')+' <span style="font-size:11px;color:#888;">('+n+')</span></div>'; }
                             resultHtml += '<div style="display:flex; justify-content:space-between; margin-bottom:4px;">';
                             resultHtml += '<div><strong style="color:#4b5563;">仓库:</strong> '+(r[2] || '-')+'</div>';
                             resultHtml += '<div><strong style="color:#4b5563;">数量:</strong> <span style="color:#059669;font-weight:bold;font-size:15px;">'+(r[3] || 0)+'</span></div>';
