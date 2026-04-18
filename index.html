@@ -1,12 +1,4 @@
-if(!sku) {
-                                const rName = skuToNameMap[String(r[0]).toUpperCase()] || '名称未知';
-                                resultHtml += '<div style="margin-bottom:4px;"><strong style="color:#4b5563;">SKU:</strong> '+(r[0] || '无')+' <span style="font-size:12px;color:#888;">('+rName+')</span></div>';
-                            } else {
-                                const rName = skuToNameMap[String(sku).toUpperCase()] || '名称未知';
-                                if (totalQty === parseInt(r[3]||0)) { // Just add name once at the top of first item if SKU is fixed
-                                     resultHtml = resultHtml.replace('</h3>', '</h3><div style="font-size:13px;color:#666;margin-bottom:10px;">产品名称: '+rName+'</div>');
-                                }
-                            }<div><strong style="color:#4b5563;">SKU:</strong> '+ (r[0] || '未知') +' <span style="font-size:12px;color:#888;">(' + (skuToNameMap[String(r[0]).toUpperCase()] || '名称未知') + ')</span></div><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
