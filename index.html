@@ -85,7 +85,7 @@
             <input type="number" id="quantity" placeholder="输入数量" value="1" min="1">
         </div>
         
-        <button id="submitBtn" class="submit-btn">✅ 确认提交至系统</button>
+        <button id="submitBtn" class="submit-btn" onclick="handleSubmit()">✅ 确认提交至系统</button>
     </div>
 
     <script>
@@ -98,6 +98,27 @@
         // 动态加载仓库/货柜配置引擎
         // ==========================================
         window.onload = function() {
+            // Fail-safe to remove overlay after 4 seconds if API hangs
+            setTimeout(() => {
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay && overlay.style.display !== 'none') {
+                    console.log("云端加载超时，强制关闭遮罩层");
+                    overlay.style.display = 'none';
+                    // Apply fallback if still empty
+                    if (document.getElementById('warehouse').options.length <= 1) {
+                         const defaultHTML = `<optgroup label="🏭 实体大仓">
+                            <option value="CN">🇨🇳 佛山仓 (CN)</option>
+                            <option value="YVR" selected>🇨🇦 温哥华仓 (YVR)</option>
+                            <option value="YYZ">🇨🇦 多伦多仓 (YYZ)</option>
+                            <option value="LAX">🇺🇸 洛杉矶仓 (LAX)</option>
+                            <option value="SEA">🚢 海上仓 (SEA)</option>
+                        </optgroup>`;
+                         document.getElementById('warehouse').innerHTML = defaultHTML;
+                         document.getElementById('targetWarehouse').innerHTML = defaultHTML;
+                    }
+                }
+            }, 4000);
+
             // 从 Google 表格实时拉取最新仓库列表
             fetch(GAS_URL + "?action=getWarehouses")
                 .then(res => res.json())
@@ -126,20 +147,14 @@
                     document.getElementById('loading-overlay').style.display = 'none'; // 隐藏加载层
                 })
                 .catch(err => {
-                    console.log("云端加载失败，使用降级本地配置");
-                    // 降级方案：如果表格没配置好，用默认的硬编码保证系统不崩
-                    const defaultHTML = `
-                        <optgroup label="🏭 实体大仓">
-                            <option value="CN">🇨🇳 中国主仓 (CN)</option>
-                            <option value="YVR">🇨🇦 温哥华仓 (YVR)</option>
+                    console.log("云端加载失败，使用降级本地配置: " + err);
+                    const defaultHTML = `<optgroup label="🏭 实体大仓">
+                            <option value="CN">🇨🇳 佛山仓 (CN)</option>
+                            <option value="YVR" selected>🇨🇦 温哥华仓 (YVR)</option>
                             <option value="YYZ">🇨🇦 多伦多仓 (YYZ)</option>
                             <option value="LAX">🇺🇸 洛杉矶仓 (LAX)</option>
-                        </optgroup>
-                        <optgroup label="🚢 海上在途 - 需在System_Config表更新">
-                            <option value="SEA-0315-YVR">YVR-货柜-出发日期0315</option>
-                            <option value="SEA-0318-LAX">LAX-货柜-出发日期0318</option>
-                        </optgroup>
-                    `;
+                            <option value="SEA">🚢 海上仓 (SEA)</option>
+                        </optgroup>`;
                     document.getElementById('warehouse').innerHTML = defaultHTML;
                     document.getElementById('targetWarehouse').innerHTML = defaultHTML;
                     document.getElementById('loading-overlay').style.display = 'none';
@@ -223,31 +238,81 @@
         function onScanFailure(error) {}
 
         // 提交
-        document.getElementById('submitBtn').onclick = function() {
-            if(!currentSku) return alert("请先扫描商品！");
+        
+        function checkInventory(sku) {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerText = '查询中...';
+            document.getElementById('result').classList.remove('show');
             
+            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.values || data.values.length === 0) {
+                        alert('未找到该产品库存记录');
+                        return;
+                    }
+                    const rows = data.values.filter(r => r[1] === sku && parseInt(r[3] || 0) > 0);
+                    if (rows.length === 0) {
+                        document.getElementById('result').innerHTML = `<div class="result-success"><h3>📦 ${sku} 当前无可用库存</h3></div>`;
+                    } else {
+                        let htmlStr = `<div class="result-success"><h3>📦 ${sku} 库存分布</h3>`;
+                        rows.forEach(r => {
+                            htmlStr += `<div style="margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:4px;">
+                                <div class="result-row"><span class="result-label">数量:</span><span class="result-value" style="color:var(--aniu-blue);">${r[3]}</span></div>
+                                <div class="result-row"><span class="result-label">仓库:</span><span class="result-value">${r[2]}</span></div>
+                                ${r[5] ? `<div class="result-row"><span class="result-label">落位号:</span><span class="result-value">${r[5]}</span></div>` : ''}
+                            </div>`;
+                        });
+                        htmlStr += '</div>';
+                        document.getElementById('result').innerHTML = htmlStr;
+                    }
+                    document.getElementById('result').classList.add('show');
+                })
+                .catch(err => alert("查询失败: " + err))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerText = '✅ 确认提交至系统';
+                });
+        }
+        function handleSubmit() {
             const actionType = document.getElementById('actionType').value;
             const warehouse = document.getElementById('warehouse').value;
-            const quantity = document.getElementById('quantity').value;
-            const bin = document.getElementById('binLocation').value;
+            const quantity = document.getElementById('quantity').value || 1;
+            const bin = document.getElementById('binLocation').value || "";
+            const btn = document.getElementById('submitBtn');
+
+            if (actionType === '查落位') {
+                if(!bin) return alert("❌ 请输入或扫描落位号 (库位)！");
+                checkLocation(bin, warehouse);
+                return;
+            }
+            if (actionType === '查库存') {
+                if(!currentSku) return alert("❌ 请先扫描或输入商品 SKU！");
+                checkInventory(currentSku);
+                return;
+            }
+
+            if(!currentSku) return alert("请先扫描商品！");
             
             if (actionType === '调拨') {
                 const targetWarehouse = document.getElementById('targetWarehouse').value;
                 if (warehouse === targetWarehouse) return alert("❌ 调出仓和调入仓不能是同一个！");
                 
-                document.getElementById('submitBtn').innerText = "正在同步多条记录...";
+                btn.innerText = "正在同步多条记录...";
+                btn.disabled = true;
                 Promise.all([
                     fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "", user: "企微(转移)" }) }),
                     fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin, user: "企微(转移)" }) })
-                ]).then(() => { successReset(); }).catch(e => { failReset(); });
+                ]).then(() => { successReset(); }).catch(e => { failReset(); }).finally(() => { btn.disabled = false; btn.innerText = "✅ 确认提交至系统"; });
             } else {
-                document.getElementById('submitBtn').innerText = "正在同步至系统...";
+                btn.innerText = "正在同步至系统...";
+                btn.disabled = true;
                 fetch(GAS_URL, {
                     method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin, user: "企微操作" })
-                }).then(() => { successReset(); }).catch(e => { failReset(); });
+                }).then(() => { successReset(); }).catch(e => { failReset(); }).finally(() => { btn.disabled = false; btn.innerText = "✅ 确认提交至系统"; });
             }
-        };
-
+        }
         function successReset() {
             alert("🎉 操作成功！流水记录和库存已实时更新！");
             document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
