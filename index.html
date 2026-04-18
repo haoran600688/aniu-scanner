@@ -55,6 +55,8 @@
                 <option value="入库">📥 入库 (增加库存)</option>
                 <option value="出库">📤 出库 (扣减库存)</option>
                 <option value="预售核销">💰 预售核销 (海上仓预售等扣减)</option>
+                <option value="查库存">🔍 查库存 (全仓总览/查单品)</option>
+                <option value="查落位">📍 查落位 (输入落位号查货)</option>
                 <option value="调拨">🚚 调拨 (库存跨仓转移)</option>
             </select>
         </div>
@@ -85,11 +87,13 @@
             <input type="number" id="quantity" placeholder="输入数量" value="1" min="1">
         </div>
         
-        <button id="submitBtn" class="submit-btn" onclick="handleSubmit()">✅ 确认提交至系统</button>
+        <button id="submitBtn" class="submit-btn">✅ 确认提交至系统</button>
     </div>
 
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbzcKkOQBr_QvRD6IQ_MsQ6ccCpe3_H8Mk4HvwI6zJMmZatx476yK6IOiJK_xl65135w/exec"; 
+        const apiKey = "AIzaSyDb3g6a9JjCZymEQzHr1TyC628mXpPz2xo";
+        const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+        const GAS_URL = "https://script.google.com//macros/s/AKfycbzcKkOQBr_QvRD6IQ_MsQ6ccCpe3_H8Mk4HvwI6zJMmZatx476yK6IOiJK_xl65135w/exec"; 
         let currentSku = "";
         let html5QrCode = null;
         let currentScanTarget = "";
@@ -98,27 +102,25 @@
         // 动态加载仓库/货柜配置引擎
         // ==========================================
         window.onload = function() {
-            // Fail-safe to remove overlay after 4 seconds if API hangs
             setTimeout(() => {
                 const overlay = document.getElementById('loading-overlay');
                 if (overlay && overlay.style.display !== 'none') {
-                    console.log("云端加载超时，强制关闭遮罩层");
-                    overlay.style.display = 'none';
-                    // Apply fallback if still empty
-                    if (document.getElementById('warehouse').options.length <= 1) {
-                         const defaultHTML = `<optgroup label="🏭 实体大仓">
-                            <option value="CN">🇨🇳 佛山仓 (CN)</option>
-                            <option value="YVR" selected>🇨🇦 温哥华仓 (YVR)</option>
+                    console.log("云端加载超时兜底触发");
+                    const defaultHTML = `<optgroup label="🏭 实体大仓">
+                            <option value="CN">🇨🇳 中国主仓 (CN)</option>
+                            <option value="YVR">🇨🇦 温哥华仓 (YVR)</option>
                             <option value="YYZ">🇨🇦 多伦多仓 (YYZ)</option>
                             <option value="LAX">🇺🇸 洛杉矶仓 (LAX)</option>
-                            <option value="SEA">🚢 海上仓 (SEA)</option>
+                        </optgroup>
+                        <optgroup label="🚢 海上在途 - 需在System_Config表更新">
+                            <option value="SEA-0315-YVR">YVR-货柜-出发日期0315</option>
+                            <option value="SEA-0318-LAX">LAX-货柜-出发日期0318</option>
                         </optgroup>`;
-                         document.getElementById('warehouse').innerHTML = defaultHTML;
-                         document.getElementById('targetWarehouse').innerHTML = defaultHTML;
-                    }
+                    document.getElementById('warehouse').innerHTML = defaultHTML;
+                    document.getElementById('targetWarehouse').innerHTML = defaultHTML;
+                    overlay.style.display = 'none';
                 }
-            }, 4000);
-
+            }, 3000);
             // 从 Google 表格实时拉取最新仓库列表
             fetch(GAS_URL + "?action=getWarehouses")
                 .then(res => res.json())
@@ -147,14 +149,20 @@
                     document.getElementById('loading-overlay').style.display = 'none'; // 隐藏加载层
                 })
                 .catch(err => {
-                    console.log("云端加载失败，使用降级本地配置: " + err);
-                    const defaultHTML = `<optgroup label="🏭 实体大仓">
-                            <option value="CN">🇨🇳 佛山仓 (CN)</option>
-                            <option value="YVR" selected>🇨🇦 温哥华仓 (YVR)</option>
+                    console.log("云端加载失败，使用降级本地配置");
+                    // 降级方案：如果表格没配置好，用默认的硬编码保证系统不崩
+                    const defaultHTML = `
+                        <optgroup label="🏭 实体大仓">
+                            <option value="CN">🇨🇳 中国主仓 (CN)</option>
+                            <option value="YVR">🇨🇦 温哥华仓 (YVR)</option>
                             <option value="YYZ">🇨🇦 多伦多仓 (YYZ)</option>
                             <option value="LAX">🇺🇸 洛杉矶仓 (LAX)</option>
-                            <option value="SEA">🚢 海上仓 (SEA)</option>
-                        </optgroup>`;
+                        </optgroup>
+                        <optgroup label="🚢 海上在途 - 需在System_Config表更新">
+                            <option value="SEA-0315-YVR">YVR-货柜-出发日期0315</option>
+                            <option value="SEA-0318-LAX">LAX-货柜-出发日期0318</option>
+                        </optgroup>
+                    `;
                     document.getElementById('warehouse').innerHTML = defaultHTML;
                     document.getElementById('targetWarehouse').innerHTML = defaultHTML;
                     document.getElementById('loading-overlay').style.display = 'none';
@@ -168,28 +176,28 @@
             const skuDisplay = document.getElementById('sku-display');
             const scanBtn = document.getElementById('scanSkuBtn');
             const submitBtn = document.getElementById('submitBtn');
+            const locGroup = document.getElementById('binLocation').parentElement.parentElement; // The locGroup div
 
             targetGroup.style.display = action === '调拨' ? 'block' : 'none';
             
             if (action === '查库存') {
+                scanBtn.style.display = 'block';
+                locGroup.style.display = 'none';
+                if (currentSku) skuDisplay.style.display = 'block';
                 submitBtn.style.display = 'block';
                 submitBtn.innerText = '🔍 查询库存数据';
             } else if (action === '查落位') {
                 scanBtn.style.display = 'none';
                 skuDisplay.style.display = 'none';
+                locGroup.style.display = 'block';
                 submitBtn.style.display = 'block';
                 submitBtn.innerText = '📍 查询落位货品';
             } else {
                 scanBtn.style.display = 'block';
+                locGroup.style.display = 'block';
                 if (currentSku) skuDisplay.style.display = 'block';
                 submitBtn.style.display = currentSku ? 'block' : 'none';
                 submitBtn.innerText = '✅ 确认提交至系统';
-            }
-        } else {
-                targetGroup.style.display = 'none';
-                warehouseLabel.innerText = '操作仓库/在途货柜';
-                warehouseLabel.style.color = '#555';
-                warehouseLabel.style.fontWeight = '500';
             }
         }
 
@@ -238,44 +246,7 @@
         function onScanFailure(error) {}
 
         // 提交
-        
-        function checkInventory(sku) {
-            const btn = document.getElementById('submitBtn');
-            btn.disabled = true;
-            btn.innerText = '查询中...';
-            document.getElementById('result').classList.remove('show');
-            
-            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.values || data.values.length === 0) {
-                        alert('未找到该产品库存记录');
-                        return;
-                    }
-                    const rows = data.values.filter(r => r[1] === sku && parseInt(r[3] || 0) > 0);
-                    if (rows.length === 0) {
-                        document.getElementById('result').innerHTML = `<div class="result-success"><h3>📦 ${sku} 当前无可用库存</h3></div>`;
-                    } else {
-                        let htmlStr = `<div class="result-success"><h3>📦 ${sku} 库存分布</h3>`;
-                        rows.forEach(r => {
-                            htmlStr += `<div style="margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:4px;">
-                                <div class="result-row"><span class="result-label">数量:</span><span class="result-value" style="color:var(--aniu-blue);">${r[3]}</span></div>
-                                <div class="result-row"><span class="result-label">仓库:</span><span class="result-value">${r[2]}</span></div>
-                                ${r[5] ? `<div class="result-row"><span class="result-label">落位号:</span><span class="result-value">${r[5]}</span></div>` : ''}
-                            </div>`;
-                        });
-                        htmlStr += '</div>';
-                        document.getElementById('result').innerHTML = htmlStr;
-                    }
-                    document.getElementById('result').classList.add('show');
-                })
-                .catch(err => alert("查询失败: " + err))
-                .finally(() => {
-                    btn.disabled = false;
-                    btn.innerText = '✅ 确认提交至系统';
-                });
-        }
-        function handleSubmit() {
+        document.getElementById('submitBtn').onclick = function() {
             const actionType = document.getElementById('actionType').value;
             const warehouse = document.getElementById('warehouse').value;
             const quantity = document.getElementById('quantity').value || 1;
@@ -287,32 +258,122 @@
                 checkLocation(bin, warehouse);
                 return;
             }
+
             if (actionType === '查库存') {
-                if(!currentSku) return alert("❌ 请先扫描或输入商品 SKU！");
-                checkInventory(currentSku);
+                checkInventory(currentSku, warehouse);
                 return;
             }
 
-            if(!currentSku) return alert("请先扫描商品！");
+            if(!currentSku) return alert("❌ 请先扫描商品！");
             
             if (actionType === '调拨') {
                 const targetWarehouse = document.getElementById('targetWarehouse').value;
                 if (warehouse === targetWarehouse) return alert("❌ 调出仓和调入仓不能是同一个！");
                 
-                btn.innerText = "正在同步多条记录...";
-                btn.disabled = true;
+                document.getElementById('submitBtn').innerText = "正在同步多条记录...";
                 Promise.all([
                     fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "", user: "企微(转移)" }) }),
                     fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin, user: "企微(转移)" }) })
-                ]).then(() => { successReset(); }).catch(e => { failReset(); }).finally(() => { btn.disabled = false; btn.innerText = "✅ 确认提交至系统"; });
+                ]).then(() => { successReset(); }).catch(e => { failReset(); });
             } else {
-                btn.innerText = "正在同步至系统...";
-                btn.disabled = true;
+                document.getElementById('submitBtn').innerText = "正在同步至系统...";
                 fetch(GAS_URL, {
                     method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin, user: "企微操作" })
-                }).then(() => { successReset(); }).catch(e => { failReset(); }).finally(() => { btn.disabled = false; btn.innerText = "✅ 确认提交至系统"; });
+                }).then(() => { successReset(); }).catch(e => { failReset(); });
             }
+        };
+
+        // ====== 查库存和落位功能 =======
+        function checkLocation(binNum, filterWarehouse) {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerText = '云端查询落位中...';
+            // Remove previous result if exists
+            let resDiv = document.getElementById('queryResult');
+            if(!resDiv) {
+                resDiv = document.createElement('div');
+                resDiv.id = 'queryResult';
+                btn.parentNode.insertBefore(resDiv, btn.nextSibling);
+            }
+            resDiv.innerHTML = '';
+            
+            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.values || data.values.length === 0) return alert('❌ 未找到记录');
+                    
+                    let items = data.values.filter(r => (r[5] || '').trim().toUpperCase() === binNum.trim().toUpperCase() && parseInt(r[3] || 0) > 0);
+                    if (filterWarehouse && filterWarehouse !== "加载中") {
+                        items = items.filter(r => r[2] === filterWarehouse || r[2].includes(filterWarehouse));
+                    }
+                    
+                    if (items.length === 0) {
+                        resDiv.innerHTML = `<div style="margin-top:15px;padding:15px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;"><h3>📍 库位 ${binNum} 无可用库存</h3></div>`;
+                    } else {
+                        let htmlStr = `<div style="margin-top:15px;padding:15px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;"><h3 style="color:#166534;border-bottom:1px solid #dcfce7;padding-bottom:8px;">📍 库位 ${binNum} 货品明细</h3>`;
+                        items.forEach(r => {
+                            htmlStr += `<div style="margin-bottom:8px; border-bottom:1px solid #dcfce7; padding-bottom:8px; display:flex; justify-content:space-between; font-size:14px;">
+                                <div><strong style="color:#4b5563;">SKU:</strong> ${r[1]}</div>
+                                <div><strong style="color:#4b5563;">数量:</strong> <span style="color:#059669;font-weight:bold;font-size:16px;">${r[3]}</span></div>
+                            </div>`;
+                        });
+                        htmlStr += '</div>';
+                        resDiv.innerHTML = htmlStr;
+                    }
+                })
+                .catch(err => alert("查询失败: " + err))
+                .finally(() => { btn.disabled = false; btn.innerText = '📍 查询落位货品'; });
         }
+
+        function checkInventory(sku, filterWarehouse) {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerText = '云端查询库存中...';
+            
+            let resDiv = document.getElementById('queryResult');
+            if(!resDiv) {
+                resDiv = document.createElement('div');
+                resDiv.id = 'queryResult';
+                btn.parentNode.insertBefore(resDiv, btn.nextSibling);
+            }
+            resDiv.innerHTML = '';
+            
+            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.values || data.values.length === 0) return alert('未找到库存记录');
+                    
+                    let rows = data.values.filter(r => parseInt(r[3] || 0) > 0);
+                    if (sku && sku !== "") rows = rows.filter(r => r[1] === sku);
+                    if (filterWarehouse && filterWarehouse !== "加载中") rows = rows.filter(r => r[2] === filterWarehouse || String(r[2]).includes(filterWarehouse));
+                    
+                    if (rows.length === 0) {
+                        resDiv.innerHTML = `<div style="margin-top:15px;padding:15px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;"><h3 style="color:#166534;">当前条件下无库存</h3></div>`;
+                    } else {
+                        let title = sku ? `📦 ${sku} 库存分布` : `🏢 ${filterWarehouse} 全部库存明细`;
+                        if (!sku && (!filterWarehouse || filterWarehouse === "加载中")) title = "🌐 全仓可用库存总览";
+                        
+                        let htmlStr = `<div style="margin-top:15px;padding:15px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;"><h3 style="color:#166534;border-bottom:1px solid #dcfce7;padding-bottom:8px;margin-bottom:10px;">${title}</h3>`;
+                        let totalQty = 0;
+                        rows.forEach(r => {
+                            totalQty += parseInt(r[3] || 0);
+                            htmlStr += `<div style="margin-bottom:8px; border-bottom:1px solid #dcfce7; padding-bottom:8px; font-size:14px;">
+                                ${!sku ? `<div style="margin-bottom:4px;"><strong style="color:#4b5563;">SKU:</strong> ${r[1]}</div>` : ''}
+                                <div style="display:flex; justify-content:space-between;">
+                                    <div><strong style="color:#4b5563;">仓库:</strong> ${r[2]} ${r[5] ? `(${r[5]})` : ''}</div>
+                                    <div><strong style="color:#4b5563;">数量:</strong> <span style="color:#059669;font-weight:bold;font-size:15px;">${r[3]}</span></div>
+                                </div>
+                            </div>`;
+                        });
+                        htmlStr = htmlStr.replace('</h3>', `</h3><div style="font-size:14px;color:#666;margin-bottom:10px;">总可用库存: <span style="color:var(--aniu-blue);font-weight:bold;font-size:16px;">${totalQty}</span></div>`);
+                        htmlStr += '</div>';
+                        resDiv.innerHTML = htmlStr;
+                    }
+                })
+                .catch(err => alert("查询失败: " + err))
+                .finally(() => { btn.disabled = false; btn.innerText = '🔍 查询库存数据'; });
+        }
+
         function successReset() {
             alert("🎉 操作成功！流水记录和库存已实时更新！");
             document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
