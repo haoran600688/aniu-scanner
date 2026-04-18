@@ -1,4 +1,12 @@
-<!DOCTYPE html>
+if(!sku) {
+                                const rName = skuToNameMap[String(r[0]).toUpperCase()] || '名称未知';
+                                resultHtml += '<div style="margin-bottom:4px;"><strong style="color:#4b5563;">SKU:</strong> '+(r[0] || '无')+' <span style="font-size:12px;color:#888;">('+rName+')</span></div>';
+                            } else {
+                                const rName = skuToNameMap[String(sku).toUpperCase()] || '名称未知';
+                                if (totalQty === parseInt(r[3]||0)) { // Just add name once at the top of first item if SKU is fixed
+                                     resultHtml = resultHtml.replace('</h3>', '</h3><div style="font-size:13px;color:#666;margin-bottom:10px;">产品名称: '+rName+'</div>');
+                                }
+                            }<div><strong style="color:#4b5563;">SKU:</strong> '+ (r[0] || '未知') +' <span style="font-size:12px;color:#888;">(' + (skuToNameMap[String(r[0]).toUpperCase()] || '名称未知') + ')</span></div><!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -107,9 +115,23 @@
         let html5QrCode;
         let currentScanTarget = 'sku';
         let currentSku = "";
+        let skuToNameMap = {};
 
         // 页面初始化：加载仓库数据
         window.onload = function() {
+
+            // 新增：从云端 Products 表拉取 SKU 到产品名称的映射
+            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Products!A2:B2000?key=" + apiKey)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.values) {
+                        data.values.forEach(row => {
+                            if (row[0] && row[1]) skuToNameMap[String(row[0]).trim().toUpperCase()] = row[1];
+                        });
+                        console.log("产品名称映射加载成功:", Object.keys(skuToNameMap).length);
+                    }
+                }).catch(e => console.log("产品映射加载失败（非核心）:", e));
+
             setTimeout(() => {
                 const overlay = document.getElementById('loading-overlay');
                 if (overlay && overlay.style.display !== 'none') {
@@ -194,6 +216,7 @@
             const type = document.getElementById('actionType').value;
             const targetGroup = document.getElementById("targetWarehouseGroup");
             const warehouseLabel = document.getElementById("warehouseLabel");
+            const warehouseSelect = document.getElementById("warehouse");
             const qtyGroup = document.getElementById("qtyGroup");
             const locGroup = document.getElementById("locGroup");
             const operatorGroup = document.getElementById("operatorGroup");
@@ -206,6 +229,7 @@
             locGroup.style.display = "block";
             operatorGroup.style.display = "block";
             scanBtn.style.display = "block";
+            warehouseSelect.parentElement.style.display = "block"; // Reset visibility
             
             if (currentSku) skuDisplay.style.display = "block";
             submitBtn.style.display = currentSku ? "block" : "none";
@@ -226,7 +250,7 @@
                 qtyGroup.style.display = "none";
                 operatorGroup.style.display = "none";
                 locGroup.style.display = "block";
-                warehouseLabel.innerText = "指定仓库 (可选)";
+                warehouseSelect.parentElement.style.display = "none"; // Hide warehouse group
                 submitBtn.style.display = "block";
                 submitBtn.innerText = "📍 查询落位货品";
             } else if (type === "预售核销") {
@@ -269,7 +293,8 @@
             if (currentScanTarget === 'sku') {
                 currentSku = decodedText;
                 document.getElementById('sku-display').style.display = 'block';
-                document.getElementById('sku-display').innerText = "✅ 识别商品: " + currentSku;
+                const prodName = skuToNameMap[currentSku.toUpperCase()] || "未知产品";
+                document.getElementById('sku-display').innerHTML = `<div>✅ 识别商品: ${currentSku}</div><div style="font-size:14px; color:#666; margin-top:4px;">名称: ${prodName}</div>`;
                 document.getElementById('submitBtn').style.display = 'block';
             } else if (currentScanTarget === 'bin') {
                 document.getElementById('binLocation').value = decodedText;
@@ -300,7 +325,7 @@
 
             if (actionType === '查落位') {
                 if(!bin) return alert("❌ 请输入或扫描落位号 (库位)！");
-                checkLocation(bin, warehouse);
+                checkLocation(bin);
                 return;
             }
 
@@ -334,22 +359,23 @@
         }
 
         // ====== 查落位功能 =======
-        function checkLocation(binNum, filterWarehouse) {
+        function checkLocation(binNum) {
             const btn = document.getElementById('submitBtn');
             btn.disabled = true;
             btn.innerText = '云端查询落位中...';
+            document.getElementById('result').innerHTML = '';
             document.getElementById('result').classList.remove('show');
             
             fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
                 .then(res => res.json())
                 .then(data => {
-                    if (!data.values || data.values.length === 0) return alert('❌ 未找到记录');
+                    if (!data.values || data.values.length === 0) return alert('❌ 未找到任何库存记录');
                     
-                    // SKU: Col 0, Qty: Col 3, Location: Col 4
-                    let items = data.values.filter(r => (r[4] || '').trim().toUpperCase() === binNum.trim().toUpperCase() && parseInt(r[3] || 0) > 0);
-                    if (filterWarehouse && filterWarehouse !== "加载中" && filterWarehouse !== "") {
-                        items = items.filter(r => r[2] === filterWarehouse || String(r[2]).includes(filterWarehouse));
-                    }
+                    let items = data.values.filter(r => {
+                        let rowBin = String(r[4] || '');
+                        let qty = parseInt(r[3] || 0);
+                        return rowBin.trim().toUpperCase() === binNum.trim().toUpperCase() && qty > 0;
+                    });
                     
                     let resultHtml = '<div class="result-success">';
                     if (items.length === 0) {
