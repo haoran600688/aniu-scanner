@@ -106,64 +106,35 @@
         const sheetId = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
         const GAS_URL = "https://script.google.com/macros/s/AKfycbzcKkOQBr_QvRD6IQ_MsQ6ccCpe3_H8Mk4HvwI6zJMmZatx476yK6IOiJK_xl65135w/exec";
         let html5QrCode;
+        // 带超时的fetch
+        async function fetchWithTimeout(url, options = {}, timeout = 5000) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            try {
+                const res = await fetch(url, { ...options, signal: controller.signal });
+                clearTimeout(timeoutId);
+                return res;
+            } catch(err) {
+                clearTimeout(timeoutId);
+                throw err;
+            }
+        }
+
         let currentScanTarget = 'sku';
         let currentSku = "";
 
-        // 页面初始化：加载仓库数据
+        // 页面初始化：直接使用本地仓库数据
         window.onload = function() {
-            if(typeof Html5Qrcode === "undefined") {
-                document.getElementById('cloud-status').innerHTML = "⚠️ 扫码库加载失败，请检查网络";
-                document.getElementById('cloud-status').style.color = "red";
-                document.getElementById('cloud-status').style.backgroundColor = "#fee2e2";
-            } else {
-                document.getElementById('cloud-status').innerHTML = "☁️ 正在从云端加载仓库数据...";
-            }
-
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000);
-            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Warehouses!A2:D100?key=" + apiKey, { signal: controller.signal })
-                .then(res => { clearTimeout(timeout); return res; })
-                .then(res => res.json())
-                .then(data => {
-                    if(!data.values || data.values.length === 0) {
-                        useFallbackWarehouse();
-                        return;
-                    }
-                    
-                    let fixedHtml = "";
-                    let seaHtml = "";
-                    data.values.forEach(row => {
-                        const type = row[0];
-                        const code = row[1];
-                        const name = row[2];
-                        if(type === "Fixed" && name) {
-                            fixedHtml += '<option value="' + code + '">' + name + '</option>';
-                        } else if(type === "Sea" && name) {
-                            seaHtml += '<option value="' + code + '">' + name + '</option>';
-                        }
-                    });
-                    
-                    let html = fixedHtml;
-                    if(seaHtml) { html += '<optgroup label="⚓ 海上货柜">' + seaHtml + '</optgroup>'; }
-                    
-                    document.getElementById('warehouse').innerHTML = html;
-                    document.getElementById('targetWarehouse').innerHTML = html;
-                    
-                    let statusEl = document.getElementById('cloud-status');
-                    statusEl.innerHTML = "✅ 云端仓库数据加载成功";
-                    statusEl.style.color = "#166534";
-                    statusEl.style.backgroundColor = "#dcfce7";
-                    
-                    // 3秒后隐藏状态栏
-                    setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
-                })
-                .catch(err => {
-                    console.log("加载仓库失败:", err);
-                    if(err.name === 'AbortError') {
-                        document.getElementById('cloud-status').innerHTML = "⚠️ 云端连接超时，使用本地数据...";
-                    }
-                    useFallbackWarehouse();
-                });
+            // 显示本地仓库数据
+            useFallbackWarehouse();
+            document.getElementById('cloud-status').innerHTML = "✅ 系统初始化完成";
+            document.getElementById('cloud-status').style.color = "#166534";
+            document.getElementById('cloud-status').style.backgroundColor = "#dcfce7";
+            // 3秒后隐藏状态栏
+            setTimeout(() => { 
+                const statusEl = document.getElementById('cloud-status');
+                if(statusEl) statusEl.style.display = 'none'; 
+            }, 3000);
         };
 
         function useFallbackWarehouse() {
@@ -335,7 +306,7 @@
             btn.innerText = '正在云端查询库位...';
             document.getElementById('result').classList.remove('show');
 
-            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
+            fetchWithTimeout("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
                 .then(res => res.json())
                 .then(data => {
                     if (!data.values || data.values.length === 0) {
@@ -383,7 +354,7 @@
             btn.innerText = '查询中...';
             document.getElementById('result').classList.remove('show');
             
-            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
+            fetchWithTimeout("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
                 .then(res => res.json())
                 .then(data => {
                     if (!data.values || data.values.length === 0) {
@@ -416,7 +387,7 @@
             btn.innerText = '正在查询全仓库存...';
             document.getElementById('result').classList.remove('show');
             
-            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
+            fetchWithTimeout("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
                 .then(res => res.json())
                 .then(data => {
                     if (!data.values || data.values.length === 0) {
