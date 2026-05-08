@@ -59,8 +59,9 @@
                 <option value="出库">📤 出库 (扣减库存)</option>
                 <option value="预售核销">💰 预售核销 (海上仓预售等扣减)</option>
                 <option value="调拨">🚚 调拨 (库存跨仓转移)</option>
-                <option value="查库存">🔍 查库存 (查单品/全仓总览)</option>
-                <option value="查落位">📍 查落位 (按库位/落位号查明细)</option>
+                <option value="查库存">🔍 查库存 (查看所有仓库)</option>
+                <option value="全仓">📋 全仓查询 (查看所有库存)</option>
+                <option value="查落位">📍 查落位 (按落位号查库存明细)</option>
             </select>
         </div>
         
@@ -107,38 +108,9 @@
         let html5QrCode;
         let currentScanTarget = 'sku';
         let currentSku = "";
-        let skuToNameMap = {};
 
         // 页面初始化：加载仓库数据
         window.onload = function() {
-
-            // 影子表同步：加载 SKU -> 产品名称
-            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Products!A2:B2000?key=" + apiKey)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.values) data.values.forEach(r => { if(r[0] && r[1]) skuToNameMap[String(r[0]).trim().toUpperCase()] = r[1]; });
-                }).catch(e => console.log("Mapping skip"));
-
-
-            // 新增：从云端 Products 表拉取 SKU 到产品名称的映射
-            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Products!A2:B2000?key=" + apiKey)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.values) {
-                        data.values.forEach(row => {
-                            if (row[0] && row[1]) skuToNameMap[String(row[0]).trim().toUpperCase()] = row[1];
-                        });
-                        console.log("产品名称映射加载成功:", Object.keys(skuToNameMap).length);
-                    }
-                }).catch(e => console.log("产品映射加载失败（非核心）:", e));
-
-            setTimeout(() => {
-                const overlay = document.getElementById('loading-overlay');
-                if (overlay && overlay.style.display !== 'none') {
-                    console.log("云端加载超时兜底触发");
-                    useFallbackWarehouse();
-                }
-            }, 3000);
             if(typeof Html5Qrcode === "undefined") {
                 document.getElementById('cloud-status').innerHTML = "⚠️ 扫码库加载失败，请检查网络";
                 document.getElementById('cloud-status').style.color = "red";
@@ -195,16 +167,14 @@
                 <option value="T">🇨🇦 多伦多实体仓 (T)</option>
                 <option value="L">🇺🇸 洛杉矶实体仓 (L)</option>
                 <optgroup label="⚓ 海上货柜">
-                    <option value="CH-YVR-01">⚓ 预计04/15到港-温哥华 (CH-YVR-01)</option>
-                    <option value="CH-YVR-02">⚓ 预计04/16到港-温哥华 (CH-YVR-02)</option>
-                    <option value="CH-YYZ-01">⚓ 预计04/18到港-多伦多 (CH-YYZ-01)</option>
-                    <option value="CH-LAX-01">⚓ 预计04/21到港-洛杉矶 (CH-LAX-01)</option>
+                    <option value="CH-YVR-01">⚓ 20260415-温哥华 (CH-YVR-01)</option>
+                    <option value="CH-YVR-02">⚓ 20260416-温哥华 (CH-YVR-02)</option>
+                    <option value="CH-YYZ-01">⚓ 20260418-多伦多 (CH-YYZ-01)</option>
+                    <option value="CH-LAX-01">⚓ 20260421-洛杉矶 (CH-LAX-01)</option>
                 </optgroup>
             `;
             document.getElementById('warehouse').innerHTML = defaultHTML;
             document.getElementById('targetWarehouse').innerHTML = defaultHTML;
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) overlay.style.display = 'none';
             let statusEl = document.getElementById('cloud-status');
             statusEl.innerHTML = "⚠️ 云端加载失败，已使用本地缓存仓库";
             statusEl.style.color = "#9a3412";
@@ -213,50 +183,38 @@
 
         // 类型切换
         function toggleTransfer() {
-            const type = document.getElementById('actionType').value;
-            const targetGroup = document.getElementById("targetWarehouseGroup");
-            const warehouseLabel = document.getElementById("warehouseLabel");
-            const warehouseSelect = document.getElementById("warehouse");
-            const qtyGroup = document.getElementById("qtyGroup");
-            const locGroup = document.getElementById("locGroup");
-            const operatorGroup = document.getElementById("operatorGroup");
-            const submitBtn = document.getElementById("submitBtn");
-            const scanBtn = document.getElementById("scanSkuBtn");
-            const skuDisplay = document.getElementById("sku-display");
+            const action = document.getElementById('actionType').value;
+            const targetGroup = document.getElementById('targetWarehouseGroup');
+            const skuDisplay = document.getElementById('sku-display');
+            const scanBtn = document.getElementById('scanSkuBtn');
+            const submitBtn = document.getElementById('submitBtn');
+
+            targetGroup.style.display = action === '调拨' ? 'block' : 'none';
             
-            targetGroup.style.display = "none";
-            qtyGroup.style.display = "block";
-            locGroup.style.display = "block";
-            operatorGroup.style.display = "block";
-            scanBtn.style.display = "block";
-            warehouseSelect.parentElement.style.display = "block"; // Reset visibility
-            
-            if (currentSku) skuDisplay.style.display = "block";
-            submitBtn.style.display = currentSku ? "block" : "none";
-            
-            if (type === "调拨") {
-                targetGroup.style.display = "block";
-                warehouseLabel.innerText = "📤 调出仓库 (来源地)";
-                submitBtn.innerText = "✅ 确认调拨";
-            } else if (type === "查库存") {
+            if (action === '查库存') {
+                submitBtn.style.display = 'block';
+                submitBtn.innerText = '🔍 查询库存数据';
+            } else if (action === '查落位') {
+                scanBtn.style.display = 'none';
+                skuDisplay.style.display = 'none';
+                submitBtn.style.display = 'block';
+                submitBtn.innerText = '📍 查询落位货品';
+            } else if (action === '全仓') {
+                scanBtn.style.display = 'none';
+                skuDisplay.style.display = 'none';
+                submitBtn.style.display = 'block';
+                submitBtn.innerText = '📋 查询全仓库存';
+            } else {
+                scanBtn.style.display = 'block';
+                if (currentSku) skuDisplay.style.display = 'block';
+                submitBtn.style.display = currentSku ? 'block' : 'none';
+                submitBtn.innerText = '✅ 确认提交至系统';
+            }
+        } else if (type === "查库存") {
                 qtyGroup.style.display = "none";
                 locGroup.style.display = "none";
                 operatorGroup.style.display = "none";
-                submitBtn.style.display = "block";
                 submitBtn.innerText = "🔍 查询库存";
-            } else if (type === "查落位") {
-                scanBtn.style.display = "none";
-                skuDisplay.style.display = "none";
-                qtyGroup.style.display = "none";
-                operatorGroup.style.display = "none";
-                locGroup.style.display = "block";
-                warehouseSelect.parentElement.style.display = "none"; // Hide warehouse group
-                submitBtn.style.display = "block";
-                submitBtn.innerText = "📍 查询落位货品";
-            } else if (type === "预售核销") {
-                warehouseLabel.innerText = "📤 操作仓库/海上货柜";
-                submitBtn.innerText = "✅ 确认预售扣减";
-                locGroup.style.display = "none"; 
             } else if (type === "入库") {
                 warehouseLabel.innerText = "📥 入库仓库";
                 submitBtn.innerText = "✅ 确认入库";
@@ -293,8 +251,7 @@
             if (currentScanTarget === 'sku') {
                 currentSku = decodedText;
                 document.getElementById('sku-display').style.display = 'block';
-                const prodName = skuToNameMap[currentSku.toUpperCase()] || "未知产品";
-                document.getElementById('sku-display').innerHTML = `<div>✅ 识别商品: ${currentSku}</div><div style="font-size:14px; color:#666; margin-top:4px;">名称: ${prodName}</div>`;
+                document.getElementById('sku-display').innerText = "✅ 识别商品: " + currentSku;
                 document.getElementById('submitBtn').style.display = 'block';
             } else if (currentScanTarget === 'bin') {
                 document.getElementById('binLocation').value = decodedText;
@@ -325,19 +282,25 @@
 
             if (actionType === '查落位') {
                 if(!bin) return alert("❌ 请输入或扫描落位号 (库位)！");
-                checkLocation(bin);
+                checkLocation(bin, warehouse);
+            } else if (actionType === '全仓') {
+                checkAllInventory();
                 return;
-            }
-
-            if (actionType === '查库存') {
-                checkInventory(currentSku, warehouse);
                 return;
             }
 
             if(!currentSku) return alert("请先扫描商品！");
-            if(!warehouse) return alert("请选择仓库！");
             
-            if (actionType === '调拨') {
+            const actionType = document.getElementById('actionType').value;
+            const warehouse = document.getElementById('warehouse').value;
+            const quantity = document.getElementById('quantity').value || 1;
+            const bin = document.getElementById('binLocation').value || "";
+            const operator = document.getElementById('operator').value || "未知";
+            const btn = document.getElementById('submitBtn');
+
+            if (actionType === '查库存') {
+                checkInventory(currentSku);
+            } else if (actionType === '调拨') {
                 const targetWarehouse = document.getElementById('targetWarehouse').value;
                 if (warehouse === targetWarehouse) return alert("❌ 调出仓和调入仓不能是同一个！");
                 
@@ -358,87 +321,158 @@
             }
         }
 
-        // ====== 查落位功能 =======
-        function checkLocation(binNum) {
+        // 查库存独立方法
+        
+        function checkLocation(binNum, filterWarehouse) {
             const btn = document.getElementById('submitBtn');
             btn.disabled = true;
-            btn.innerText = '云端查询落位中...';
-            document.getElementById('result').innerHTML = '';
+            btn.innerText = '正在云端查询库位...';
             document.getElementById('result').classList.remove('show');
-            
+
             fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
                 .then(res => res.json())
                 .then(data => {
-                    if (!data.values || data.values.length === 0) return alert('❌ 未找到任何库存记录');
+                    if (!data.values || data.values.length === 0) {
+                        alert('❌ 未找到任何库存记录');
+                        return;
+                    }
                     
-                    let items = data.values.filter(r => {
-                        let rowBin = String(r[4] || '');
-                        let qty = parseInt(r[3] || 0);
-                        return rowBin.trim().toUpperCase() === binNum.trim().toUpperCase() && qty > 0;
+                    // Filter by location (col 5)
+                    let items = data.values.filter(row => {
+                        let rowBin = row[5] || '';
+                        return rowBin.trim().toUpperCase() === binNum.trim().toUpperCase() && parseInt(row[3] || 0) > 0;
                     });
                     
-                    let resultHtml = '<div class="result-success">';
-                    if (items.length === 0) {
-                        resultHtml += '<h3>📍 库位 '+binNum+' 无可用库存</h3></div>';
-                    } else {
-                        resultHtml += '<h3>📍 库位 '+binNum+' 货品明细</h3>';
-                        items.forEach(r => {
-                            resultHtml += '<div style="margin-bottom:8px; border-bottom:1px solid #dcfce7; padding-bottom:8px; display:flex; justify-content:space-between; font-size:14px;">';
-                            resultHtml += '<div><strong style="color:#4b5563;">SKU:</strong> '+ (r[0] || '未知') +' <span style="font-size:12px;color:#888;">(' + (skuToNameMap[String(r[0]).toUpperCase()] || '新产品') + ')</span></div>';
-                            resultHtml += '<div><strong style="color:#4b5563;">数量:</strong> <span style="color:#059669;font-weight:bold;font-size:16px;">'+r[3]+'</span></div>';
-                            resultHtml += '</div>';
-                        });
-                        resultHtml += '</div>';
+                    // Filter by warehouse if a specific one is selected
+                    if (filterWarehouse && filterWarehouse !== "") {
+                         items = items.filter(row => row[2] === filterWarehouse || String(row[2]).includes(filterWarehouse));
                     }
-                    document.getElementById('result').innerHTML = resultHtml;
+
+                    if (items.length === 0) {
+                        document.getElementById('result').innerHTML = `<div class="result-success"><h3>📍 库位 ${binNum} 空空如也</h3><p>没有找到相关商品。</p></div>`;
+                    } else {
+                        let htmlStr = `<div class="result-success"><h3>📍 库位 ${binNum} 共有 ${items.length} 种商品</h3>`;
+                        items.forEach(row => {
+                            htmlStr += `<div style="margin-bottom:8px; border-bottom:1px solid #dcfce7; padding-bottom:8px;">
+                                <div class="result-row"><span class="result-label">SKU:</span> <span class="result-value">${row[1]}</span></div>
+                                <div class="result-row"><span class="result-label">数量:</span> <span class="result-value" style="color:#059669; font-size:16px;">${row[3]}</span></div>
+                                <div class="result-row"><span class="result-label">仓库:</span> <span class="result-value">${row[2]}</span></div>
+                            </div>`;
+                        });
+                        htmlStr += '</div>';
+                        document.getElementById('result').innerHTML = htmlStr;
+                    }
                     document.getElementById('result').classList.add('show');
                 })
                 .catch(err => alert("网络错误: " + err))
-                .finally(() => { btn.disabled = false; btn.innerText = '📍 查询落位货品'; });
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerText = '✅ 确认提交至系统';
+                });
         }
 
-        function checkInventory(sku, warehouseFilter) {
+        function checkInventory(sku) {
             const btn = document.getElementById('submitBtn');
             btn.disabled = true;
-            btn.innerText = '云端查询库存中...';
+            btn.innerText = '查询中...';
             document.getElementById('result').classList.remove('show');
             
             fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
                 .then(res => res.json())
                 .then(data => {
-                    if (!data.values || data.values.length === 0) return alert('未找到库存记录');
-                    
-                    let rows = data.values.filter(r => parseInt(r[3] || 0) > 0);
-                    if (sku && sku !== "") rows = rows.filter(r => r[0] && String(r[0]).toUpperCase() === String(sku).toUpperCase());
-                    if (warehouseFilter && warehouseFilter !== "加载中" && warehouseFilter !== "") rows = rows.filter(r => r[2] === warehouseFilter || String(r[2]).includes(warehouseFilter));
-                    
-                    let resultHtml = '<div class="result-success">';
-                    if (rows.length === 0) {
-                        resultHtml += '<h3>当前条件下无可用库存</h3></div>';
-                    } else {
-                        let title = sku ? "📦 "+sku+" 库存分布" : (warehouseFilter ? "🏢 "+warehouseFilter+" 仓库明细" : "🌐 全仓可用库存总览");
-                        resultHtml += '<h3>' + title + '</h3>';
-                            if(sku) { const n = skuToNameMap[sku.toUpperCase()]; if(n) resultHtml += '<div style="font-size:13px;color:#666;margin-bottom:10px;">产品名称: '+n+'</div>'; }
-                        let totalQty = 0;
-                        rows.forEach(r => {
-                            totalQty += parseInt(r[3] || 0);
-                            resultHtml += '<div style="margin-bottom:8px; border-bottom:1px solid #dcfce7; padding-bottom:8px; font-size:14px;">';
-                            if(!sku) { const n = skuToNameMap[String(r[0]).toUpperCase()] || '新产品'; resultHtml += '<div style="margin-bottom:4px;"><strong style="color:#4b5563;">SKU:</strong> '+(r[0] || '无')+' <span style="font-size:11px;color:#888;">('+n+')</span></div>'; }
-                            resultHtml += '<div style="display:flex; justify-content:space-between; margin-bottom:4px;">';
-                            resultHtml += '<div><strong style="color:#4b5563;">仓库:</strong> '+(r[2] || '-')+'</div>';
-                            resultHtml += '<div><strong style="color:#4b5563;">数量:</strong> <span style="color:#059669;font-weight:bold;font-size:15px;">'+(r[3] || 0)+'</span></div>';
-                            resultHtml += '</div>';
-                            if(r[4]) resultHtml += '<div><strong style="color:#4b5563;">落位号:</strong> <span style="color:#2563eb;">'+r[4]+'</span></div>';
-                            resultHtml += '</div>';
-                        });
-                        resultHtml = resultHtml.replace('</h3>', '</h3><div style="font-size:14px;color:#666;margin-bottom:10px;">总可用库存: <span style="color:var(--aniu-blue);font-weight:bold;font-size:16px;">'+totalQty+'</span></div>');
-                        resultHtml += '</div>';
+                    if (!data.values || data.values.length === 0) {
+                        alert('未找到该产品库存记录');
+                        return;
                     }
-                    document.getElementById('result').innerHTML = resultHtml;
+                    const matches = data.values.filter(row => row[0] && row[0].toLowerCase().includes(sku.toLowerCase()) && parseInt(row[3] || 0) > 0);
+                    if (matches.length === 0) {
+                        alert('未找到SKU为 ' + sku + ' 的库存记录');
+                        return;
+                    }
+                    showInventoryResult(matches, sku);
+                })
+                .catch(err => {
+                    alert('查询失败，请检查网络');
+                    console.error(err);
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerText = '🔍 查询库存';
+                });
+        }
+
+        function showInventoryResult(rows, sku) {
+
+        // 全仓查询功能
+        function checkAllInventory() {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerText = '正在查询全仓库存...';
+            document.getElementById('result').classList.remove('show');
+            
+            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/ERP_Inventory!A2:G1000?key=" + apiKey)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.values || data.values.length === 0) {
+                        document.getElementById('result').innerHTML = '<div class="result-success"><h3>📋 全仓库存</h3><p>暂无库存记录。</p></div>';
+                        document.getElementById('result').classList.add('show');
+                        return;
+                    }
+                    
+                    // Filter items with qty > 0
+                    let items = data.values.filter(row => parseInt(row[3] || 0) > 0);
+                    
+                    if (items.length === 0) {
+                        document.getElementById('result').innerHTML = '<div class="result-success"><h3>📋 全仓库存</h3><p>所有仓库库存为零。</p></div>';
+                    } else {
+                        let htmlStr = '<div class="result-success"><h3>📋 全仓库存共有 ' + items.length + ' 条记录</h3>';
+                        items.forEach(row => {
+                            htmlStr += '<div style="margin-bottom:8px; border-bottom:1px solid #dcfce7; padding-bottom:8px;">';
+                                + '<div class="result-row"><span class="result-label">SKU:</span> <span class="result-value">' + row[1] + '</span></div>';
+                                + '<div class="result-row"><span class="result-label">数量:</span> <span class="result-value" style="color:#059669;">' + row[3] + '</span></div>';
+                                + '<div class="result-row"><span class="result-label">仓库:</span> <span class="result-value">' + row[2] + '</span></div>';
+                                + '<div class="result-row"><span class="result-label">落位:</span> <span class="result-value">' + (row[5] || '-') + '</span></div>';
+                            </div>';
+                        });
+                        htmlStr += '</div>';
+                        document.getElementById('result').innerHTML = htmlStr;
+                    }
                     document.getElementById('result').classList.add('show');
                 })
-                .catch(err => alert("查询失败: " + err))
-                .finally(() => { btn.disabled = false; btn.innerText = '🔍 查询库存'; });
+                .catch(err => alert('查询全仓失败: ' + err))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerText = '📋 查询全仓库存';
+                }));
+        }
+            let totalQty = 0;
+            let msg = "📦 【" + sku + "】库存查询结果\n\n━━━━━━━━━━━━━━━━\n";
+            let inventory = {};
+            
+            rows.forEach(row => {
+                const warehouse = row[2] || '-';
+                const qty = parseInt(row[3]) || 0;
+                const bin = row[4] || '-';
+                const key = warehouse + "::" + bin;
+                if (!inventory[key]) inventory[key] = { warehouse, bin, qty: 0 };
+                inventory[key].qty += qty;
+            });
+
+            let resultHtml = '<div class="result-success"><h3>🔍 ' + sku + ' 库存</h3>';
+            for (let key in inventory) {
+                let item = inventory[key];
+                if (item.qty === 0) continue; 
+                totalQty += item.qty;
+                msg += "📍 " + item.warehouse + " | 数量: " + item.qty + " | 落位: " + item.bin + "\n";
+                resultHtml += '<div class="result-row"><span class="result-label">' + item.warehouse + '</span><span class="result-value">' + item.qty + ' 件 (落位: ' + item.bin + ')</span></div>';
+            }
+            
+            msg += "━━━━━━━━━━━━━━━━\n📊 总计: " + totalQty + " 件";
+            resultHtml += '<div class="result-row" style="border-top:1px solid #ccc;margin-top:10px;padding-top:10px;"><span class="result-label">📊 总计</span><span class="result-value">' + totalQty + ' 件</span></div></div>';
+            
+            document.getElementById('result').innerHTML = resultHtml;
+            document.getElementById('result').classList.add('show');
+            alert(msg);
         }
 
         function successReset() {
