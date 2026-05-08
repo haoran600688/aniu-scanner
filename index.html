@@ -119,7 +119,10 @@
                 document.getElementById('cloud-status').innerHTML = "☁️ 正在从云端加载仓库数据...";
             }
 
-            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Warehouses!A2:D100?key=" + apiKey)
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Warehouses!A2:D100?key=" + apiKey, { signal: controller.signal })
+                .then(res => { clearTimeout(timeout); return res; })
                 .then(res => res.json())
                 .then(data => {
                     if(!data.values || data.values.length === 0) {
@@ -156,6 +159,9 @@
                 })
                 .catch(err => {
                     console.log("加载仓库失败:", err);
+                    if(err.name === 'AbortError') {
+                        document.getElementById('cloud-status').innerHTML = "⚠️ 云端连接超时，使用本地数据...";
+                    }
                     useFallbackWarehouse();
                 });
         };
