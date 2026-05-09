@@ -36,7 +36,7 @@
 
     <div class="header">
         <img src="./logo.jpg" alt="Aniu Logo">
-        <h1>Aniu Ai ERP</h1>
+        <h1>Aniu Home Ai</h1>
     </div>
     
     <div class="card">
@@ -53,13 +53,20 @@
             <label>出/入库类型</label>
             <select id="actionType" onchange="toggleTransfer()">
                 <option value="">-- 请选择操作类型 --</option>
-                <option value="入库">📥 入库 (增加库存)</option>
-                <option value="出库">📤 出库 (扣减库存)</option>
-                <option value="预售核销">🎫 预售核销 (海上仓预售等扣减)</option>
-                <option value="调拨">🚚 调拨 (库存跨仓转移)</option>
-                <option value="查库存">🔍 查库存 (查看所有仓库)</option>
-                <option value="全仓查询">📋 全仓查询 (查看所有库存)</option>
-                <option value="查落位">📍 查落位 (按落位号查库存明细)</option>
+                <option value="入库">📥 入库</option>
+                <option value="退货入库">🔙 退货入库</option>
+                <option value="调拨入库">➡️ 调拨入库</option>
+                <option value="出库">📤 出库</option>
+                <option value="销售出库">💰 销售出库</option>
+                <option value="调拨出库">⬅️ 调拨出库</option>
+                <option value="报损">⚠️ 报损</option>
+                <option value="预售核销">🎫 预售核销</option>
+                <option value="调拨">🚚 调拨</option>
+                <option value="查库存">🔍 查库存</option>
+                <option value="全仓查询">📋 全仓查询</option>
+                <option value="查落位">📍 查落位</option>
+                <option value="盘点">🔧 盘点</option>
+                <option value="调整">⚙️ 调整</option>
             </select>
         </div>
         
@@ -104,6 +111,7 @@
         let currentScanTarget = "";
 
         // 预设仓库数据（从 Warehouses 表读取并嵌入）
+// 表头: Type | Code | Name | Group
 const DEFAULT_WAREHOUSES = [
     { name: "🇨🇳 佛山实体仓 (F)", group: "实体仓" },
     { name: "🇨🇦 温哥华实体仓 (V)", group: "实体仓" },
@@ -118,7 +126,26 @@ const DEFAULT_WAREHOUSES = [
     { name: "F-L-2026/3/31", group: "海上货柜" }
 ];
 
+// 从 Google Sheets 加载仓库数据
+async function loadWarehousesFromSheets() {
+    const SHEET_ID = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
+    try {
+        const response = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Warehouses`);
+        const text = await response.text();
+        const json = JSON.parse(text.replace(/google\.visualization\.Query\.setResponse\(/, '').replace(/\);$/, ''));
+        const rows = json.table.rows.map(row => ({
+            name: row.c[2]?.v || row.c[1]?.v || '',  // Name 列
+            group: row.c[3]?.v || row.c[0]?.v || ''   // Group 列
+        }));
+        return rows.filter(w => w.name);
+    } catch (e) {
+        console.error('加载仓库失败，使用默认数据:', e);
+        return DEFAULT_WAREHOUSES;
+    }
+}
+
 function renderWarehouses(warehouseData) {
+    // 按 Group 分类
     let groups = {};
     warehouseData.forEach(item => {
         let g = item.group || '其他';
@@ -141,112 +168,128 @@ function renderWarehouses(warehouseData) {
 }
 
 window.onload = function() {
-    renderWarehouses(DEFAULT_WAREHOUSES);
+    // 从 Google Sheets 异步加载仓库数据
+    loadWarehousesFromSheets().then(data => {
+        renderWarehouses(data);
+    }).catch(e => {
+        console.error('加载失败:', e);
+        renderWarehouses(DEFAULT_WAREHOUSES);
+    });
 };
 
-        // UI 联动逻辑
-        function toggleTransfer() {
-            const type = document.getElementById('actionType').value;
-            const targetGroup = document.getElementById('targetWarehouseGroup');
-            const warehouseLabel = document.getElementById('warehouseLabel');
-            
-            if (type === '调拨') {
-                targetGroup.style.display = 'block';
-                warehouseLabel.innerText = '⬅️ 调出仓库 (来源地)';
-                warehouseLabel.style.color = '#e53e3e';
-                warehouseLabel.style.fontWeight = 'bold';
-            } else {
-                targetGroup.style.display = 'none';
-                warehouseLabel.innerText = '操作仓库/在途货柜';
-                warehouseLabel.style.color = '#555';
-                warehouseLabel.style.fontWeight = '500';
-            }
-        }
+// UI 联动逻辑
+function toggleTransfer() {
+    const type = document.getElementById('actionType').value;
+    const targetGroup = document.getElementById('targetWarehouseGroup');
+    const warehouseLabel = document.getElementById('warehouseLabel');
+    const binGroup = document.getElementById('binLocation').parentElement.parentElement;
+    
+    // 预售核销不需要落位号
+    if (type === '预售核销') {
+        binGroup.style.display = 'none';
+    } else {
+        binGroup.style.display = 'flex';
+    }
+    
+    if (type === '调拨') {
+        targetGroup.style.display = 'block';
+        warehouseLabel.innerText = '⬅️ 调出仓库 (来源地)';
+        warehouseLabel.style.color = '#e53e3e';
+        warehouseLabel.style.fontWeight = 'bold';
+    } else {
+        targetGroup.style.display = 'none';
+        warehouseLabel.innerText = '操作仓库/在途货柜';
+        warehouseLabel.style.color = '#555';
+        warehouseLabel.style.fontWeight = '500';
+    }
+}
 
         // --- 扫码核心逻辑 ---
-        function startScanner(target) {
-            currentScanTarget = target;
-            document.getElementById('reader-container').style.display = 'block';
-            document.getElementById('scanSkuBtn').style.display = 'none';
-            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-            
-            html5QrCode.start(
-                { facingMode: "environment" }, 
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                onScanSuccess, onScanFailure
-            ).catch(err => {
-                alert("无法启动摄像头，请允许访问相机");
-                stopScanner();
-            });
-        }
-        function stopScanner() {
-            if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('reader-container').style.display = 'none';
-                    document.getElementById('scanSkuBtn').style.display = 'block';
-                }).catch(err => console.log(err));
-            } else {
-                document.getElementById('reader-container').style.display = 'none';
-                document.getElementById('scanSkuBtn').style.display = 'block';
-            }
-        }
-        document.getElementById('scanSkuBtn').onclick = () => startScanner('sku');
-        document.getElementById('scanBinBtn').onclick = () => startScanner('bin');
-        document.getElementById('cancelScanBtn').onclick = () => stopScanner();
+function startScanner(target) {
+    currentScanTarget = target;
+    document.getElementById('reader-container').style.display = 'block';
+    document.getElementById('scanSkuBtn').style.display = 'none';
+    if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+    
+    html5QrCode.start(
+        { facingMode: "environment" }, 
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess, onScanFailure
+    ).catch(err => {
+        alert("无法启动摄像头，请允许访问相机");
+        stopScanner();
+    });
+}
+function stopScanner() {
+    if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().then(() => {
+            document.getElementById('reader-container').style.display = 'none';
+            document.getElementById('scanSkuBtn').style.display = 'block';
+        }).catch(err => console.log(err));
+    } else {
+        document.getElementById('reader-container').style.display = 'none';
+        document.getElementById('scanSkuBtn').style.display = 'block';
+    }
+}
+document.getElementById('scanSkuBtn').onclick = () => startScanner('sku');
+document.getElementById('scanBinBtn').onclick = () => startScanner('bin');
+document.getElementById('cancelScanBtn').onclick = () => stopScanner();
 
-        function onScanSuccess(decodedText) {
-            if (currentScanTarget === 'sku') {
-                currentSku = decodedText;
-                document.getElementById('sku-display').style.display = 'block';
-                document.getElementById('sku-display').innerText = "✅ 识别商品: " + currentSku;
-                document.getElementById('submitBtn').style.display = 'block';
-            } else if (currentScanTarget === 'bin') {
-                document.getElementById('binLocation').value = decodedText;
-            }
-            stopScanner();
-        }
-        function onScanFailure(error) {}
+function onScanSuccess(decodedText) {
+    if (currentScanTarget === 'sku') {
+        currentSku = decodedText;
+        document.getElementById('sku-display').style.display = 'block';
+        document.getElementById('sku-display').innerText = "✅ 识别商品: " + currentSku;
+        document.getElementById('submitBtn').style.display = 'block';
+    } else if (currentScanTarget === 'bin') {
+        document.getElementById('binLocation').value = decodedText;
+    }
+    stopScanner();
+}
+function onScanFailure(error) {}
 
         // 提交
-        document.getElementById('submitBtn').onclick = function() {
-            if(!currentSku) return alert("请先扫描商品！");
-            
-            const actionType = document.getElementById('actionType').value;
-            const warehouse = document.getElementById('warehouse').value;
-            const quantity = document.getElementById('quantity').value;
-            const bin = document.getElementById('binLocation').value;
-            const operator = document.getElementById('operator').value.toUpperCase() || 'A000';
-            
-            if (actionType === '调拨') {
-                const targetWarehouse = document.getElementById('targetWarehouse').value;
-                if (warehouse === targetWarehouse) return alert("❌ 调出仓和调入仓不能是同一个！");
-                
-                document.getElementById('submitBtn').innerText = "正在同步多条记录...";
-                Promise.all([
-                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "", user: operator }) }),
-                    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin, user: operator }) })
-                ]).then(() => { successReset(); }).catch(e => { failReset(); });
-            } else {
-                document.getElementById('submitBtn').innerText = "正在同步至系统...";
-                fetch(GAS_URL, {
-                    method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin, user: operator })
-                }).then(() => { successReset(); }).catch(e => { failReset(); });
-            }
-        };
+document.getElementById('submitBtn').onclick = function() {
+    if(!currentSku) return alert("请先扫描商品！");
+    if(!document.getElementById('operator').value) return alert("请输入操作员工编号！");
+    
+    const actionType = document.getElementById('actionType').value;
+    const warehouse = document.getElementById('warehouse').value;
+    const quantity = document.getElementById('quantity').value;
+    const bin = document.getElementById('binLocation').value;
+    const operator = document.getElementById('operator').value.toUpperCase() || 'A000';
+    
+    if (actionType === '调拨') {
+        const targetWarehouse = document.getElementById('targetWarehouse').value;
+        if (warehouse === targetWarehouse) return alert("❌ 调出仓和调入仓不能是同一个！");
+        
+        document.getElementById('submitBtn').innerText = "正在同步多条记录...";
+        Promise.all([
+            fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "", user: operator }) }),
+            fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin, user: operator }) })
+        ]).then(() => { successReset(); }).catch(e => { failReset(); });
+    } else {
+        document.getElementById('submitBtn').innerText = "正在同步至系统...";
+        fetch(GAS_URL, {
+            method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin, user: operator })
+        }).then(() => { successReset(); }).catch(e => { failReset(); });
+    }
+};
 
-        function successReset() {
-            alert("🎉 操作成功！流水记录和库存已实时更新！");
-            document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
-            currentSku = "";
-            document.getElementById('sku-display').style.display = 'none';
-            document.getElementById('submitBtn').style.display = 'none';
-            document.getElementById('quantity').value = "1";
-            document.getElementById('binLocation').value = "";
-        }
-        function failReset() {
-            alert("提交失败，请检查网络");
-            document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
-        }
-    </script>
+function successReset() {
+    alert("🎉 操作成功！流水记录和库存已实时更新！");
+    document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
+    currentSku = "";
+    document.getElementById('sku-display').style.display = 'none';
+    document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('quantity').value = "1";
+    document.getElementById('binLocation').value = "";
+}
+
+function failReset() {
+    alert("提交失败，请检查网络");
+    document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
+}
+</script>
 </body>
 </html>
