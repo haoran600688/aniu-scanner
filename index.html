@@ -89,12 +89,7 @@
             <input type="number" id="quantity" placeholder="输入数量" value="1" min="1">
         </div>
 
-        <div class="form-group">
-            <label>操作员工编号</label>
-            <input type="text" id="operator" placeholder="请输入员工编号，如：A000" style="text-transform: uppercase;">
-        </div>
-        
-        <button id="submitBtn" class="submit-btn">✅ 确认提交至系统</button>
+         <button id="submitBtn" class="submit-btn">✅ 确认提交至系统</button>
     </div>
 
     <script>
@@ -244,13 +239,11 @@ function onScanFailure(error) {}
         // 提交
 document.getElementById('submitBtn').onclick = function() {
     if(!currentSku) return alert("请先扫描商品！");
-    if(!document.getElementById('operator').value) return alert("请输入操作员工编号！");
     
     const actionType = document.getElementById('actionType').value;
     const warehouse = document.getElementById('warehouse').value;
     const quantity = document.getElementById('quantity').value;
     const bin = document.getElementById('binLocation').value;
-    const operator = document.getElementById('operator').value.toUpperCase() || 'A000';
     
     if (actionType === '调拨') {
         const targetWarehouse = document.getElementById('targetWarehouse').value;
@@ -258,13 +251,13 @@ document.getElementById('submitBtn').onclick = function() {
         
         document.getElementById('submitBtn').innerText = "正在同步多条记录...";
         Promise.all([
-            fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "", user: operator }) }),
-            fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin, user: operator }) })
+            fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: "调拨出库", quantity: quantity, bin: "" }) }),
+            fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: targetWarehouse, actionType: "调拨入库", quantity: quantity, bin: bin }) })
         ]).then(() => { successReset(); }).catch(e => { failReset(); });
     } else {
         document.getElementById('submitBtn').innerText = "正在同步至系统...";
         fetch(GAS_URL, {
-            method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin, user: operator })
+            method: 'POST', body: JSON.stringify({ sku: currentSku, warehouse: warehouse, actionType: actionType, quantity: quantity, bin: bin })
         }).then(() => { successReset(); }).catch(e => { failReset(); });
     }
 };
