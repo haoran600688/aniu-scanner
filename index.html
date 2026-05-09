@@ -53,20 +53,13 @@
             <label>出/入库类型</label>
             <select id="actionType" onchange="toggleTransfer()">
                 <option value="">-- 请选择操作类型 --</option>
-                <option value="入库">📥 入库</option>
-                <option value="退货入库">🔙 退货入库</option>
-                <option value="调拨入库">➡️ 调拨入库</option>
-                <option value="出库">📤 出库</option>
-                <option value="销售出库">💰 销售出库</option>
-                <option value="调拨出库">⬅️ 调拨出库</option>
-                <option value="报损">⚠️ 报损</option>
-                <option value="预售核销">🎫 预售核销</option>
-                <option value="调拨">🚚 调拨</option>
-                <option value="查库存">🔍 查库存</option>
-                <option value="全仓查询">📋 全仓查询</option>
-                <option value="查落位">📍 查落位</option>
-                <option value="盘点">🔧 盘点</option>
-                <option value="调整">⚙️ 调整</option>
+                <option value="入库">📥 入库（加库存）</option>
+                <option value="出库">📤 出库（扣减库存）</option>
+                <option value="预售核销">🎫 预售核销（海上仓预售等扣减）</option>
+                <option value="调拨">🚚 调拨（库存跨仓转移）</option>
+                <option value="查库存">🔍 查库存（查看所有仓库）</option>
+                <option value="全仓查询">📋 全仓查询（查看所有库存）</option>
+                <option value="查落位">📍 查落位（按落位号查库存明细）</option>
             </select>
         </div>
         
