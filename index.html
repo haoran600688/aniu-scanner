@@ -90,14 +90,8 @@
         </div>
 
         <div class="form-group">
-            <label>操作人编号</label>
-            <select id="operator">
-                <option value="A000">Ran (A000)</option>
-                <option value="A001">Kitty (A001)</option>
-                <option value="A002">Jasper (A002)</option>
-                <option value="A003">Ivy (A003)</option>
-                <option value="A004">Ava (A004)</option>
-            </select>
+            <label>操作员工编号</label>
+            <input type="text" id="operator" placeholder="请输入员工编号，如：A000" style="text-transform: uppercase;">
         </div>
         
         <button id="submitBtn" class="submit-btn">✅ 确认提交至系统</button>
@@ -109,57 +103,46 @@
         let html5QrCode = null;
         let currentScanTarget = "";
 
-        // ==========================================
-        // 动态加载仓库/货柜配置引擎
-        // ==========================================
-        window.onload = function() {
-            // 从 Google 表格实时拉取最新仓库列表
-            fetch(GAS_URL + "?action=getWarehouses")
-                .then(res => res.json())
-                .then(data => {
-                    if(!data || data.length === 0) throw new Error("无数据");
-                    
-                    // 按组分类渲染 (如: '实体大仓', 'YVR海上货柜')
-                    let groups = {};
-                    data.forEach(item => {
-                        let groupName = item.group || "其他";
-                        if(!groups[groupName]) groups[groupName] = [];
-                        groups[groupName].push(item.name);
-                    });
+        // 预设仓库数据（从 Warehouses 表读取并嵌入）
+const DEFAULT_WAREHOUSES = [
+    { name: "🇨🇳 佛山实体仓 (F)", group: "实体仓" },
+    { name: "🇨🇦 温哥华实体仓 (V)", group: "实体仓" },
+    { name: "🇨🇦 多伦多实体仓 (T)", group: "实体仓" },
+    { name: "🇺🇸 洛杉矶实体仓 (L)", group: "实体仓" },
+    { name: "F-V-2026/3/18", group: "海上货柜" },
+    { name: "F-V-2026/4/8", group: "海上货柜" },
+    { name: "F-V-2026/4/20", group: "海上货柜" },
+    { name: "F-V-2026/5/16", group: "海上货柜" },
+    { name: "F-T-2026/3/15", group: "海上货柜" },
+    { name: "F-T-2026/3/31", group: "海上货柜" },
+    { name: "F-L-2026/3/31", group: "海上货柜" }
+];
 
-                    let html = "";
-                    for(let g in groups) {
-                        html += `<optgroup label="🏭 ${g}">`;
-                        groups[g].forEach(name => {
-                            html += `<option value="${name}">${name}</option>`;
-                        });
-                        html += `</optgroup>`;
-                    }
-                    
-                    document.getElementById('warehouse').innerHTML = html;
-                    document.getElementById('targetWarehouse').innerHTML = html;
-                    document.getElementById('loading-overlay').style.display = 'none'; // 隐藏加载层
-                })
-                .catch(err => {
-                    console.log("云端加载失败，使用降级本地配置");
-                    // 降级方案：如果表格没配置好，用默认的硬编码保证系统不崩
-                    const defaultHTML = `
-                        <optgroup label="🏭 实体大仓">
-                            <option value="CN">🇨🇳 中国主仓 (CN)</option>
-                            <option value="YVR">🇨🇦 温哥华仓 (YVR)</option>
-                            <option value="YYZ">🇨🇦 多伦多仓 (YYZ)</option>
-                            <option value="LAX">🇺🇸 洛杉矶仓 (LAX)</option>
-                        </optgroup>
-                        <optgroup label="🚢 海上在途 - 需在System_Config表更新">
-                            <option value="SEA-0315-YVR">YVR-货柜-出发日期0315</option>
-                            <option value="SEA-0318-LAX">LAX-货柜-出发日期0318</option>
-                        </optgroup>
-                    `;
-                    document.getElementById('warehouse').innerHTML = defaultHTML;
-                    document.getElementById('targetWarehouse').innerHTML = defaultHTML;
-                    document.getElementById('loading-overlay').style.display = 'none';
-                });
-        };
+function renderWarehouses(warehouseData) {
+    let groups = {};
+    warehouseData.forEach(item => {
+        let g = item.group || '其他';
+        if (!groups[g]) groups[g] = [];
+        groups[g].push(item.name);
+    });
+
+    let html = "";
+    for (let g in groups) {
+        html += `<optgroup label="🏭 ${g}">`;
+        groups[g].forEach(name => {
+            html += `<option value="${name}">${name}</option>`;
+        });
+        html += `</optgroup>`;
+    }
+
+    document.getElementById('warehouse').innerHTML = html;
+    document.getElementById('targetWarehouse').innerHTML = html;
+    document.getElementById('loading-overlay').style.display = 'none';
+}
+
+window.onload = function() {
+    renderWarehouses(DEFAULT_WAREHOUSES);
+};
 
         // UI 联动逻辑
         function toggleTransfer() {
@@ -232,7 +215,7 @@
             const warehouse = document.getElementById('warehouse').value;
             const quantity = document.getElementById('quantity').value;
             const bin = document.getElementById('binLocation').value;
-            const operator = document.getElementById('operator') ? document.getElementById('operator').value : 'A000';
+            const operator = document.getElementById('operator').value.toUpperCase() || 'A000';
             
             if (actionType === '调拨') {
                 const targetWarehouse = document.getElementById('targetWarehouse').value;
