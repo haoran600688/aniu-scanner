@@ -95,6 +95,12 @@
         </div>
         
         <button id="submitBtn" class="submit-btn">✅ 确认提交至系统</button>
+        
+        <!-- 查询结果显示区域 -->
+        <div id="queryResults" style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 12px;">
+            <h3 style="margin: 0 0 15px 0; color: #333;">📊 查询结果</h3>
+            <div id="queryResultsContent"></div>
+        </div>
     </div>
 
     <script>
@@ -189,6 +195,24 @@ function toggleTransfer() {
         warehouseLabel.innerText = '⬅️ 调出仓库 (来源地)';
         warehouseLabel.style.color = '#e53e3e';
         warehouseLabel.style.fontWeight = 'bold';
+    } else if (type === '查库存' || type === '全仓查询') {
+        // 查库存/全仓查询：显示仓库，隐藏目标仓库和数量
+        targetGroup.style.display = 'none';
+        binGroup.style.display = 'flex';
+        warehouseLabel.innerText = '操作仓库/在途货柜';
+        warehouseLabel.style.color = '#555';
+        warehouseLabel.style.fontWeight = '500';
+        document.getElementById('quantity').parentElement.style.display = 'flex';
+        document.getElementById('quantity').value = '1';
+    } else if (type === '查落位') {
+        // 查落位：隐藏仓库和数量，只显示落位号
+        targetGroup.style.display = 'none';
+        binGroup.style.display = 'flex';
+        warehouseLabel.innerText = '操作仓库/在途货柜';
+        warehouseLabel.style.color = '#555';
+        warehouseLabel.style.fontWeight = '500';
+        document.getElementById('quantity').parentElement.style.display = 'none';
+        document.getElementById('quantity').value = '0';
     } else {
         targetGroup.style.display = 'none';
         warehouseLabel.innerText = '操作仓库/在途货柜';
@@ -241,12 +265,112 @@ function onScanSuccess(decodedText) {
 }
 function onScanFailure(error) {}
 
+        // 查询处理函数 - 使用 gviz API 直接查询库存
+        function handleQuery(actionType) {
+            const warehouse = document.getElementById('warehouse').value;
+            const bin = document.getElementById('binLocation').value;
+            const sku = currentSku;
+            
+            const queryResults = document.getElementById('queryResults');
+            const queryResultsContent = document.getElementById('queryResultsContent');
+            
+            queryResults.style.display = 'block';
+            queryResultsContent.innerHTML = '<p style="color: #666;">正在查询...</p>';
+            document.getElementById('submitBtn').innerText = "正在查询...";
+            
+            const SHEET_ID = '1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw';
+            const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Inventory`;
+            
+            fetch(gvizUrl)
+            .then(res => res.text())
+            .then(text => {
+                // 解析 JSONP 格��
+                const json = JSON.parse(
+                    text.replace(/google\.visualization\.Query\.setResponse\(/, '')
+                    .replace(/\);$/, '')
+                );
+                
+                const rows = json.table.rows;
+                let results = [];
+                
+                rows.forEach(row => {
+                    const rowData = {
+                        id: row.c[0]?.v || '',
+                        sku: row.c[1]?.v || '',
+                        warehouse: row.c[2]?.v || '',
+                        quantity: row.c[3]?.v || 0,
+                        bin: row.c[5]?.v || ''
+                    };
+                    
+                    // 根据查询类型过滤
+                    if (actionType === '查库存') {
+                        // 精确查询 SKU + 仓库
+                        if (sku && rowData.sku === sku && rowData.warehouse === warehouse) {
+                            results.push(rowData);
+                        }
+                    } else if (actionType === '全仓查询') {
+                        // 查询所有仓库的该 SKU
+                        if (sku && rowData.sku === sku) {
+                            results.push(rowData);
+                        }
+                    } else if (actionType === '查落位') {
+                        // 按落位号查询
+                        if (bin && rowData.bin === bin) {
+                            results.push(rowData);
+                        } else if (!bin && rowData.warehouse === warehouse) {
+                            results.push(rowData);
+                        }
+                    }
+                });
+                
+                displayQueryResults(results, sku, actionType);
+            })
+            .catch(e => {
+                document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
+                queryResultsContent.innerHTML = '<p style="color: #e53e3e;">查询失败: ' + e.message + '</p>';
+            });
+        }
+        
+        function displayQueryResults(results, sku, actionType) {
+            const queryResults = document.getElementById('queryResults');
+            const queryResultsContent = document.getElementById('queryResultsContent');
+            document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
+            
+            if (!results || results.length === 0) {
+                queryResultsContent.innerHTML = '<p style="color: #666;">未查询到相关记录</p>';
+                return;
+            }
+            
+            // 渲染查询结果
+            let html = '<div style="display: grid; gap: 10px;">';
+            results.forEach(item => {
+                html += `<div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid var(--aniu-blue);">
+                    <div style="font-weight: bold; color: #333;">${item.warehouse || 'N/A'}</div>
+                    <div style="color: #666; font-size: 14px; margin-top: 4px;">
+                        SKU: ${item.sku || sku} | 
+                        数量: <span style="color: #10B981; font-weight: bold;">${item.quantity || 0}</span>
+                        ${item.bin ? ' | 落位: ' + item.bin : ''}
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            queryResultsContent.innerHTML = html;
+        }
+
         // 提交
 document.getElementById('submitBtn').onclick = function() {
+    const actionType = document.getElementById('actionType').value;
+    
+    // 处理查询类型
+    if (actionType === '查库存' || actionType === '全仓查询' || actionType === '查落位') {
+        handleQuery(actionType);
+        return;
+    }
+    
+    // 入库/出库等操作需要先扫描商品
     if(!currentSku) return alert("请先扫描商品！");
     const operator = document.getElementById('operator').value.toUpperCase() || 'A000';
     
-    const actionType = document.getElementById('actionType').value;
     const warehouse = document.getElementById('warehouse').value;
     const quantity = document.getElementById('quantity').value;
     const bin = document.getElementById('binLocation').value;
