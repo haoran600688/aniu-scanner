@@ -208,83 +208,64 @@
             const binGroup = document.getElementById('binGroup');
             const warehouse = document.getElementById('warehouse').value;
             
-            // 预售核销：实体仓显示落位号，非实体仓隐藏
-            if (type === '预售核销') {
-                // 海上货柜 = 非实体仓，需要隐藏落位号
-                if (warehouse && !warehouse.includes('实体仓')) {
-                    binGroup.style.display = 'none';
-                } else {
-                    binGroup.style.display = 'flex';
-                }
-                // 预售核销：显示数量输入
-                document.getElementById('quantity').parentElement.style.display = 'block';
-            } else if (type === '查库存' || type === '全仓查询' || type === '查落位') {
-                // 查询类：隐藏数量
-                document.getElementById('quantity').parentElement.style.display = 'none';
-            } else {
-                binGroup.style.display = 'flex';
-                // 其他操作：显示数量
-                document.getElementById('quantity').parentElement.style.display = 'block';
-            }
+            // 重置所有元素为默认状态
+            sourceGroup.style.display = 'none';
+            targetGroup.style.display = 'none';
+            warehouseGroup.style.display = 'block';
+            binGroup.style.display = 'flex';
+            warehouseLabel.innerText = '操作仓库/在途货柜';
+            warehouseLabel.style.color = '#555';
+            warehouseLabel.style.fontWeight = '500';
+            document.getElementById('quantity').parentElement.style.display = 'block';
+            document.getElementById('scanSkuBtn').style.display = 'block';
+            document.getElementById('sku-display').style.display = 'none';
             
+            // 调拨
             if (type === '调拨') {
                 sourceGroup.style.display = 'block';
                 targetGroup.style.display = 'block';
                 warehouseGroup.style.display = 'none';
                 binGroup.style.display = 'none';
-                // 调拨：显示数量
                 document.getElementById('quantity').parentElement.style.display = 'block';
-            } else if (type === '查库存') {
-                sourceGroup.style.display = 'none';
-                targetGroup.style.display = 'none';
+            }
+            // 查库存
+            else if (type === '查库存') {
                 warehouseGroup.style.display = 'none';
                 binGroup.style.display = 'none';
                 document.getElementById('quantity').parentElement.style.display = 'none';
                 document.getElementById('quantity').value = '1';
-                
                 warehouseLabel.innerText = '查询结果将在扫码后显示';
                 warehouseLabel.style.color = '#10B981';
-warehouseLabel.style.fontWeight = 'bold';
-            } else if (type === '全仓查询') {
-                sourceGroup.style.display = 'none';
-                targetGroup.style.display = 'none';
-                warehouseGroup.style.display = 'block';
+                warehouseLabel.style.fontWeight = 'bold';
+                document.getElementById('scanSkuBtn').style.display = 'block';
+            }
+            // 全仓查询
+            else if (type === '全仓查询') {
                 binGroup.style.display = 'none';
-                warehouseLabel.innerText = '操作仓库/在途货柜';
-                warehouseLabel.style.color = '#555';
-                warehouseLabel.style.fontWeight = '500';
                 document.getElementById('quantity').parentElement.style.display = 'none';
                 document.getElementById('quantity').value = '0';
-                // 全仓查询：隐藏扫码按钮
                 document.getElementById('scanSkuBtn').style.display = 'none';
                 document.getElementById('sku-display').style.display = 'none';
-            } else if (type === '调拨') {
-                sourceGroup.style.display = 'block';
-                targetGroup.style.display = 'block';
-                warehouseGroup.style.display = 'none';
-                binGroup.style.display = 'none';
-            } else if (type === '查落位') {
-                sourceGroup.style.display = 'none';
-                targetGroup.style.display = 'none';
+            }
+            // 查落位
+            else if (type === '查落位') {
                 warehouseGroup.style.display = 'none';
                 binGroup.style.display = 'flex';
+                document.getElementById('quantity').parentElement.style.display = 'none';
                 warehouseLabel.innerText = '输入或扫描落位号';
                 warehouseLabel.style.color = '#10B981';
-                warehouseLabel.style.fontWeight = '500';
-                document.getElementById('quantity').parentElement.style.display = 'none';
-                // 查落位：隐藏扫码按钮，显示扫落位按钮
                 document.getElementById('scanSkuBtn').style.display = 'none';
                 document.getElementById('sku-display').style.display = 'none';
-            } else {
-                sourceGroup.style.display = 'none';
-                targetGroup.style.display = 'none';
-                warehouseGroup.style.display = 'block';
-                binGroup.style.display = 'flex';
-                warehouseLabel.innerText = '操作仓库/在途货柜';
-                warehouseLabel.style.color = '#555';
-                warehouseLabel.style.fontWeight = '500';
-                // 其他操作：显示扫码按钮
-                document.getElementById('scanSkuBtn').style.display = 'block';
+            }
+            // 预售核销
+            else if (type === '预售核销') {
+                if (warehouse && !warehouse.includes('实体仓')) {
+                    binGroup.style.display = 'none';
+                }
+            }
+            // 入库/出库
+            else if (type === '入库' || type === '出库') {
+                // 默认设置已正确
             }
         }
         
