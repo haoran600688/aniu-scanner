@@ -43,6 +43,10 @@
     <div class="card">
         <!-- SKU 扫码 -->
         <button id="scanSkuBtn" class="scan-btn">📷 扫码识别商品 (SKU)</button>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <input type="text" id="manualSku" placeholder="或手动输入SKU" style="flex: 1;">
+            <button onclick="setManualSku()" style="padding: 12px 20px; background: #10B981; color: white; border: none; border-radius: 8px;">确定</button>
+        </div>
         <div id="sku-display">等待扫码...</div>
         
         <div id="reader-container">
@@ -129,10 +133,27 @@
     </div>
 
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbzcKkOQBr_QvRD6IQ_MsQ6ccCpe3_H8Mk4HvwI6zJMmZatx476yK6IOiJK_xl65135w/exec"; 
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxM8mfmIhNfEk5K6lfss4d2SNaaF9SGYnq6u-cuOlaAzTlS2GdakIjbOUPgUnUNyMcs/exec';
         let currentSku = "";
         let html5QrCode = null;
         let currentScanTarget = "";
+        
+        // 手动输入 SKU
+        function setManualSku() {
+            const input = document.getElementById('manualSku');
+            const sku = input.value.trim();
+            if (!sku) return alert("请输入SKU");
+            currentSku = sku;
+            document.getElementById('sku-display').style.display = 'block';
+            document.getElementById('sku-display').innerText = "✅ 已输入商品: " + currentSku;
+            document.getElementById('submitBtn').style.display = 'block';
+            
+            // 查库存：自动查询
+            const actionType = document.getElementById('actionType').value;
+            if (actionType === '查库存') {
+                handleQuery(actionType);
+            }
+        }
 
         // 预设仓库数据（从 Warehouses 表读取并嵌入）
         // 表头: Type | Code | Name | Group
@@ -339,9 +360,11 @@
             }
             stopScanner();
         }
-        function onScanFailure(error) {}
+        function onScanFailure(error) {
+            // 静默处理扫码失败，不显示错误
+        }
 
-        // 查询处理函数 - 通过 GAS 查询库存
+// 查询处理函数 - 通过 GAS 查询库存
         function handleQuery(actionType) {
             const warehouse = document.getElementById('warehouse').value;
             const bin = document.getElementById('binLocationOld').value;
@@ -369,19 +392,37 @@
             else if (actionType === '查库存') gasAction = 'queryInventory';
             else if (actionType === '全仓查询') gasAction = 'queryInventory';
             
-            const params = new URLSearchParams({
-                action: gasAction,
-                q: querySku,
-                sku: querySku,
-                warehouse: actionType === '全仓查询' ? warehouse : (actionType === '查库存' ? '' : warehouse),
-                queryAll: actionType === '全仓查询' ? 'true' : '',
-                bin: actionType === '查落位' ? bin : ''
-            });
+            // 构建 URL 参数
+            let url = GAS_URL + '?action=' + encodeURIComponent(gasAction);
+            if (querySku) url += '&q=' + encodeURIComponent(querySku) + '&sku=' + encodeURIComponent(querySku);
+            if (actionType === '全仓查询') url += '&warehouse=' + encodeURIComponent(warehouse) + '&queryAll=true';
+            if (actionType === '查落位') url += '&bin=' + encodeURIComponent(bin);
             
-            fetch(GAS_URL + '?' + params.toString())
-            .then(res => res.json())
-            .then(data => {
-                const results = Array.isArray(data) ? data : [];
+            console.log('Query URL:', url);
+            
+            fetch(url, { redirect: 'follow' })
+            .then(res => {
+                console.log('Response status:', res.status, 'URL:', res.url);
+                if (!res.ok) throw new Error('HTTP错误: ' + res.status);
+                return res.text();
+            })
+            .then(text => {
+                console.log('Response length:', text.length);
+                // 检查是否返回 HTML（登录页面）而不是 JSON
+                if (text.includes('<!doctype html') || text.includes('<html')) {
+                    console.log('Got HTML instead of JSON - likely login redirect');
+                    queryResultsContent.innerHTML = '<p style="color: #e53e3e;">❌ 需要重新授权<br>请先在浏览器访问 GAS URL 并登录一次<br><a href="' + GAS_URL + '?action=test" target="_blank">打开GAS</a></p>';
+                    document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
+                    return;
+                }
+                // 尝试解析 JSON
+                try {
+                    var data = JSON.parse(text);
+                } catch (e) {
+                    console.log('JSON parse error:', e.message);
+                    var data = [];
+                }
+                var results = (Array.isArray(data) && data.length > 0) ? data : [];
                 displayQueryResults(results, sku, actionType);
             })
             .catch(e => {
