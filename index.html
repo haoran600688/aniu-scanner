@@ -133,7 +133,7 @@
     </div>
 
     <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxM8mfmIhNfEk5K6lfss4d2SNaaF9SGYnq6u-cuOlaAzTlS2GdakIjbOUPgUnUNyMcs/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzcKkOQBr_QvRD6IQ_MsQ6ccCpe3_H8Mk4HvwI6zJMmZatx476yK6IOiJK_xl65135w/exec';
         let currentSku = "";
         let html5QrCode = null;
         let currentScanTarget = "";
@@ -367,8 +367,8 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbxM8mfmIhNfEk5K6lfss4d2
 // Sheet ID 配置
 const SHEET_ID = "1kwxS8XIF8Zj9enEBmhBC5QGZNRu_rdUlE9Gn9mPGkuw";
 
-// 通过 Google Visualization API 查询库存数据
-async function queryInventoryFromSheets(actionType, sku, warehouse, bin) {
+// 通过 GAS 查询库存（GAS 后端需要完整功能）
+function queryInventoryFromGAS(actionType, sku, warehouse, bin) {
     const queryResults = document.getElementById('queryResults');
     const queryResultsContent = document.getElementById('queryResultsContent');
     
@@ -376,77 +376,50 @@ async function queryInventoryFromSheets(actionType, sku, warehouse, bin) {
     queryResultsContent.innerHTML = '<p style="color: #666;">正在查询...</p>';
     document.getElementById('submitBtn').innerText = "正在查询...";
     
-    try {
-        // 使用 Google Visualization API 直接读取 Inventory 表
-        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Inventory`;
-        const response = await fetch(url);
-        const text = await response.text();
-        
-        // 解析 JSONP 响应
-        const json = JSON.parse(text.replace(/google\.visualization\.Query\.setResponse\(/, '').replace(/\);$/, ''));
-        const rows = json.table.rows;
-        
-        if (!rows || rows.length === 0) {
-            displayQueryResults([], sku, actionType);
-            return;
+    let url = GAS_URL + '?action=';
+    if (actionType === '查库存' || actionType === '全仓查询') {
+        url += 'queryInventory';
+        if (sku) url += '&q=' + encodeURIComponent(sku);
+        if (warehouse) url += '&warehouse=' + encodeURIComponent(warehouse);
+        if (actionType === '全仓查询') url += '&queryAll=true';
+    } else if (actionType === '查落位') {
+        url += '查落位&bin=' + encodeURIComponent(bin);
+    }
+    
+    fetch(url, { redirect: 'follow' })
+    .then(res => res.text())
+    .then(text => {
+        try {
+            var data = JSON.parse(text);
+            if (data.message && !data.sku) {
+                // GAS 返回的是简单消息，不是查询结果
+                queryResultsContent.innerHTML = '<p style="color: #e53e3e;">❌ GAS 后端查询功能未完整配置<br>请通知管理员更新 GAS 代码</p>';
+            } else {
+                var results = Array.isArray(data) ? data : [];
+                displayQueryResults(results, sku, actionType);
+            }
+        } catch (e) {
+            queryResultsContent.innerHTML = '<p style="color: #e53e3e;">解析错误: ' + e.message + '</p>';
         }
-        
-        // 处理数据
-        const results = [];
-        rows.forEach(row => {
-            const rowSku = row.c[1]?.v || '';
-            const rowWh = row.c[2]?.v || '';
-            const rowQty = row.c[3]?.v || 0;
-            const rowBin = (row.c[5]?.v || '').toString().toUpperCase();
-            
-            let match = false;
-            
-            if (actionType === '查库存') {
-                // 查SKU在所有仓库的库存
-                match = (sku && rowSku === sku);
-            } else if (actionType === '全仓查询') {
-                // 查指定仓库的所有库存
-                match = (!sku && warehouse && rowWh === warehouse) || (sku && rowSku === sku && rowWh === warehouse);
-            } else if (actionType === '查落位') {
-                // 查指定落位号的所有库存
-                match = (bin && rowBin === bin.toUpperCase());
-            }
-            
-            if (match) {
-                results.push({
-                    sku: rowSku,
-                    warehouse: rowWh,
-                    quantity: rowQty,
-                    location: rowBin
-                });
-            }
-        });
-        
-        displayQueryResults(results, sku, actionType);
-    } catch (e) {
-        console.error('查询失败:', e);
+        document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
+    })
+    .catch(e => {
         document.getElementById('submitBtn').innerText = "✅ 确认提交至系统";
         queryResultsContent.innerHTML = '<p style="color: #e53e3e;">查询失败: ' + e.message + '</p>';
-    }
+    });
 }
 
-// 查询处理函数 - 使用 Google Visualization API
+// 查询处理函数 - 使用 GAS
 function handleQuery(actionType) {
     const warehouse = document.getElementById('warehouse').value;
     const bin = document.getElementById('binLocationOld').value;
     const sku = currentSku;
     
-    // 全仓查询需要选择仓库
     if (actionType === '全仓查询' && !warehouse) return alert("❌ 请选择操作仓库！");
-    
-    // 查落位必须填写落位号
     if (actionType === '查落位' && !bin) return alert("❌ 请填写或扫描落位号！");
-    
-    // 查库存需要SKU
     if (actionType === '查库存' && !sku) return alert("❌ 请先扫描商品！");
     
-    // 使用 Google Visualization API 查询
-    queryInventoryFromSheets(actionType, sku, warehouse, bin);
+    queryInventoryFromGAS(actionType, sku, warehouse, bin);
 }
         
         function displayQueryResults(results, sku, actionType) {
