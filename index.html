@@ -133,7 +133,7 @@
     </div>
 
     <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzcKkOQBr_QvRD6IQ_MsQ6ccCpe3_H8Mk4HvwI6zJMmZatx476yK6IOiJK_xl65135w/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbygewSmSgEI_soFe50QqHPLDRlZ84ZJE488Ap9FCn18G-QQtiA0amwrM5MoYNcCbdyZ/exec';
         let currentSku = "";
         let html5QrCode = null;
         let currentScanTarget = "";
@@ -378,12 +378,14 @@ function queryInventoryFromGAS(actionType, sku, warehouse, bin) {
     
     let url = GAS_URL + '?action=';
     if (actionType === '查库存' || actionType === '全仓查询') {
-        url += 'queryInventory';
+        // 使用中文action避免编码问题
+        url += '查库存';
         if (sku) url += '&q=' + encodeURIComponent(sku);
         if (warehouse) url += '&warehouse=' + encodeURIComponent(warehouse);
         if (actionType === '全仓查询') url += '&queryAll=true';
     } else if (actionType === '查落位') {
-        url += '查落位&bin=' + encodeURIComponent(bin);
+        // 查落位 - 使用中文action避免问题
+        url += '查落位&q=' + encodeURIComponent(bin);
     }
     
     fetch(url, { redirect: 'follow' })
