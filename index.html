@@ -380,9 +380,13 @@ function queryInventoryFromGAS(actionType, sku, warehouse, bin) {
     if (actionType === '查库存' || actionType === '全仓查询') {
         // 使用中文action避免编码问题
         url += '查库存';
-        if (sku) url += '&q=' + encodeURIComponent(sku);
-        if (warehouse) url += '&warehouse=' + encodeURIComponent(warehouse);
-        if (actionType === '全仓查询') url += '&queryAll=true';
+        // 全仓查询需要带q参数才能触发正确逻辑
+        if (actionType === '全仓查询') {
+            url += '&queryAll=true&q=';  // 空白q触发全仓查询
+        } else {
+            if (sku) url += '&q=' + encodeURIComponent(sku);
+            if (warehouse) url += '&warehouse=' + encodeURIComponent(warehouse);
+        }
     } else if (actionType === '查落位') {
         // 查落位 - 使用中文action避免问题
         url += '查落位&q=' + encodeURIComponent(bin);
